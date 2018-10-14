@@ -99,9 +99,9 @@ MapBuilderBridge::MapBuilderBridge(
     const NodeOptions& node_options,
     std::unique_ptr<cartographer::mapping::MapBuilderInterface> map_builder,
     tf2_ros::Buffer* const tf_buffer)
-    : node_options_(node_options),
-      map_builder_(std::move(map_builder)),
-      tf_buffer_(tf_buffer) {}
+    : map_builder_(std::move(map_builder)),
+      tf_buffer_(tf_buffer),
+      node_options_(node_options) {}
 
 void MapBuilderBridge::LoadState(const std::string& state_filename,
                                  bool load_frozen_state) {

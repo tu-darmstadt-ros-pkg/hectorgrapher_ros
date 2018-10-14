@@ -44,6 +44,7 @@
 #include "ros/serialization.h"
 #include "sensor_msgs/PointCloud2.h"
 #include "tf2_eigen/tf2_eigen.h"
+#include "tf2_sensor_msgs/tf2_sensor_msgs.h"
 #include "visualization_msgs/MarkerArray.h"
 
 namespace cartographer_ros {
@@ -213,11 +214,22 @@ void Node::PublishLocalTrajectoryData(const ::ros::TimerEvent& timer_event) {
           point_cloud.push_back(cartographer::sensor::ToTimedRangefinderPoint(
               point, 0.f /* time */));
         }
-        scan_matched_point_cloud_publisher_.publish(ToPointCloud2Message(
+
+        sensor_msgs::PointCloud2 cloud_in_world = ToPointCloud2Message(
             carto::common::ToUniversal(trajectory_data.local_slam_data->time),
             node_options_.map_frame,
             carto::sensor::TransformTimedPointCloud(
-                point_cloud, trajectory_data.local_to_map.cast<float>())));
+                point_cloud, trajectory_data.local_to_map.cast<float>()));
+        sensor_msgs::PointCloud2 cloud_in_sensor_frame;
+        geometry_msgs::TransformStamped transform =
+            map_builder_bridge_.tf_buffer_->lookupTransform(
+                trajectory_data.trajectory_options.matched_pointcloud_frame,
+                trajectory_data.trajectory_options.tracking_frame,
+                cloud_in_world.header.stamp, ros::Duration(1.0));
+
+        tf2::doTransform(cloud_in_world, cloud_in_sensor_frame, transform);
+
+        scan_matched_point_cloud_publisher_.publish(cloud_in_world);
       }
       extrapolator.AddPose(trajectory_data.local_slam_data->time,
                            trajectory_data.local_slam_data->local_pose);
