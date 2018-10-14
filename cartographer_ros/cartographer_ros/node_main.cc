@@ -20,6 +20,7 @@
 #include "cartographer_ros/node_options.h"
 #include "cartographer_ros/ros_log_sink.h"
 #include "gflags/gflags.h"
+#include "std_msgs/String.h"
 #include "tf2_ros/transform_listener.h"
 
 DEFINE_bool(collect_metrics, false,
@@ -47,37 +48,63 @@ DEFINE_string(
 namespace cartographer_ros {
 namespace {
 
-void Run() {
-  constexpr double kTfBufferCacheTimeInSeconds = 10.;
-  tf2_ros::Buffer tf_buffer{::ros::Duration(kTfBufferCacheTimeInSeconds)};
-  tf2_ros::TransformListener tf(tf_buffer);
-  NodeOptions node_options;
-  TrajectoryOptions trajectory_options;
-  std::tie(node_options, trajectory_options) =
-      LoadOptions(FLAGS_configuration_directory, FLAGS_configuration_basename);
+class NodeWrapper {
+ public:
+  std::unique_ptr<tf2_ros::TransformListener> tf_;
+  std::unique_ptr<Node> node_;
+  std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+  ros::Subscriber syscommand_subscriber_;
+  ros::NodeHandle node_handle_;
 
-  auto map_builder = absl::make_unique<cartographer::mapping::MapBuilder>(
-      node_options.map_builder_options);
-  Node node(node_options, std::move(map_builder), &tf_buffer,
-            FLAGS_collect_metrics);
-  if (!FLAGS_load_state_filename.empty()) {
-    node.LoadState(FLAGS_load_state_filename, FLAGS_load_frozen_state);
+  NodeWrapper() {
+    syscommand_subscriber_ = node_handle_.subscribe(
+        "syscommand", 1000, &NodeWrapper::SyscommandCallback, this);
   }
 
-  if (FLAGS_start_trajectory_with_default_topics) {
-    node.StartTrajectoryWithDefaultTopics(trajectory_options);
+  void Run() {
+    constexpr double kTfBufferCacheTimeInSeconds = 10.;
+    tf_buffer_ = absl::make_unique<tf2_ros::Buffer>(
+        ::ros::Duration(kTfBufferCacheTimeInSeconds));
+    tf_ = absl::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
+    NodeOptions node_options;
+    TrajectoryOptions trajectory_options;
+    std::tie(node_options, trajectory_options) = LoadOptions(
+        FLAGS_configuration_directory, FLAGS_configuration_basename);
+
+    auto map_builder = absl::make_unique<cartographer::mapping::MapBuilder>(
+        node_options.map_builder_options);
+    node_ = absl::make_unique<Node>(node_options, std::move(map_builder),
+                                    tf_buffer_.get(), FLAGS_collect_metrics);
+    if (!FLAGS_load_state_filename.empty()) {
+      node_->LoadState(FLAGS_load_state_filename, FLAGS_load_frozen_state);
+    }
+
+    if (FLAGS_start_trajectory_with_default_topics) {
+      node_->StartTrajectoryWithDefaultTopics(trajectory_options);
+    }
   }
 
-  ::ros::spin();
-
-  node.FinishAllTrajectories();
-  node.RunFinalOptimization();
-
-  if (!FLAGS_save_state_filename.empty()) {
-    node.SerializeState(FLAGS_save_state_filename,
-                        true /* include_unfinished_submaps */);
+  void Finish() {
+    node_->FinishAllTrajectories();
+    //    node_->RunFinalOptimization();
+    //    if (!FLAGS_save_state_filename.empty()) {
+    //      node_->SerializeState(FLAGS_save_state_filename,
+    //                            true /* include_unfinished_submaps */);
+    //    }
   }
-}
+
+  void SyscommandCallback(const std_msgs::String::ConstPtr& msg) {
+    if (msg->data == "reset_cartographer") {
+      ROS_INFO("Resetting now due to syscommand.");
+      Finish();
+      node_.reset();
+      tf_.reset();
+      tf_buffer_.reset();
+      Run();
+      ROS_INFO("Finished reset.");
+    }
+  }
+};
 
 }  // namespace
 }  // namespace cartographer_ros
@@ -95,6 +122,9 @@ int main(int argc, char** argv) {
   ::ros::start();
 
   cartographer_ros::ScopedRosLogSink ros_log_sink;
-  cartographer_ros::Run();
+  cartographer_ros::NodeWrapper node_wrapper;
+  node_wrapper.Run();
+  ::ros::spin();
+  node_wrapper.Finish();
   ::ros::shutdown();
 }
