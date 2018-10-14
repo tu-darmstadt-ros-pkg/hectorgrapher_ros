@@ -51,6 +51,7 @@
 #include "sensor_msgs/MultiEchoLaserScan.h"
 #include "sensor_msgs/NavSatFix.h"
 #include "sensor_msgs/PointCloud2.h"
+#include "std_msgs/Bool.h"
 #include "tf2_ros/transform_broadcaster.h"
 
 namespace cartographer_ros {
@@ -110,6 +111,7 @@ class Node {
       const sensor_msgs::MultiEchoLaserScan::ConstPtr& msg);
   void HandlePointCloud2Message(int trajectory_id, const std::string& sensor_id,
                                 const sensor_msgs::PointCloud2::ConstPtr& msg);
+  void HandleUpdatePublishedTransformMessage(const std_msgs::Bool& msg);
 
   // Serializes the complete Node state.
   void SerializeState(const std::string& filename,
@@ -209,9 +211,14 @@ class Node {
     ::cartographer::common::FixedRatioSampler landmark_sampler;
   };
 
+  bool update_published_transform;
+  ::ros::Subscriber update_published_transform_subscriber_;
+
   // These are keyed with 'trajectory_id'.
   std::map<int, ::cartographer::mapping::PoseExtrapolator> extrapolators_;
   std::unordered_map<int, TrajectorySensorSamplers> sensor_samplers_;
+  std::unordered_map<int, geometry_msgs::TransformStamped>
+      last_updated_published_transforms_;
   std::unordered_map<int, std::vector<Subscriber>> subscribers_;
   std::unordered_set<std::string> subscribed_topics_;
   std::unordered_set<int> trajectories_scheduled_for_finish_;

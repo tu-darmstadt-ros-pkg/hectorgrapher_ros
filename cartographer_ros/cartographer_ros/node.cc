@@ -93,7 +93,8 @@ Node::Node(
     std::unique_ptr<cartographer::mapping::MapBuilderInterface> map_builder,
     tf2_ros::Buffer* const tf_buffer, const bool collect_metrics)
     : node_options_(node_options),
-      map_builder_bridge_(node_options_, std::move(map_builder), tf_buffer) {
+      map_builder_bridge_(node_options_, std::move(map_builder), tf_buffer),
+      update_published_transform(true) {
   absl::MutexLock lock(&mutex_);
   if (collect_metrics) {
     metrics_registry_ = absl::make_unique<metrics::FamilyFactory>();
@@ -262,31 +263,44 @@ void Node::PublishLocalTrajectoryData(const ::ros::TimerEvent& timer_event) {
         trajectory_data.local_to_map * tracking_to_local;
 
     if (trajectory_data.published_to_tracking != nullptr) {
-      if (trajectory_data.trajectory_options.provide_odom_frame) {
-        std::vector<geometry_msgs::TransformStamped> stamped_transforms;
+      if (update_published_transform ||
+          last_updated_published_transforms_.find(entry.first) ==
+              last_updated_published_transforms_.end()) {
+        if (trajectory_data.trajectory_options.provide_odom_frame) {
+          std::vector<geometry_msgs::TransformStamped> stamped_transforms;
 
-        stamped_transform.header.frame_id = node_options_.map_frame;
-        stamped_transform.child_frame_id =
-            trajectory_data.trajectory_options.odom_frame;
-        stamped_transform.transform =
-            ToGeometryMsgTransform(trajectory_data.local_to_map);
-        stamped_transforms.push_back(stamped_transform);
+          stamped_transform.header.frame_id = node_options_.map_frame;
+          stamped_transform.child_frame_id =
+              trajectory_data.trajectory_options.odom_frame;
+          stamped_transform.transform =
+              ToGeometryMsgTransform(trajectory_data.local_to_map);
+          stamped_transforms.push_back(stamped_transform);
 
-        stamped_transform.header.frame_id =
-            trajectory_data.trajectory_options.odom_frame;
-        stamped_transform.child_frame_id =
-            trajectory_data.trajectory_options.published_frame;
-        stamped_transform.transform = ToGeometryMsgTransform(
-            tracking_to_local * (*trajectory_data.published_to_tracking));
-        stamped_transforms.push_back(stamped_transform);
+          stamped_transform.header.frame_id =
+              trajectory_data.trajectory_options.odom_frame;
+          stamped_transform.child_frame_id =
+              trajectory_data.trajectory_options.published_frame;
+          stamped_transform.transform = ToGeometryMsgTransform(
+              tracking_to_local * (*trajectory_data.published_to_tracking));
+          stamped_transforms.push_back(stamped_transform);
 
-        tf_broadcaster_.sendTransform(stamped_transforms);
+          tf_broadcaster_.sendTransform(stamped_transforms);
+        } else {
+          stamped_transform.header.frame_id = node_options_.map_frame;
+          stamped_transform.child_frame_id =
+              trajectory_data.trajectory_options.published_frame;
+          stamped_transform.transform = ToGeometryMsgTransform(
+              tracking_to_map * (*trajectory_data.published_to_tracking));
+          tf_broadcaster_.sendTransform(stamped_transform);
+        }
+        last_updated_published_transforms_[entry.first] = stamped_transform;
       } else {
-        stamped_transform.header.frame_id = node_options_.map_frame;
-        stamped_transform.child_frame_id =
-            trajectory_data.trajectory_options.published_frame;
-        stamped_transform.transform = ToGeometryMsgTransform(
-            tracking_to_map * (*trajectory_data.published_to_tracking));
+        geometry_msgs::TransformStamped stamped_transform =
+            last_updated_published_transforms_[entry.first];
+        stamped_transform.header.stamp =
+            node_options_.use_pose_extrapolator
+                ? ToRos(now)
+                : ToRos(trajectory_data.local_slam_data->time);
         tf_broadcaster_.sendTransform(stamped_transform);
       }
     }
@@ -450,6 +464,10 @@ void Node::LaunchSubscribers(const TrajectoryOptions& options,
              this),
          topic});
   }
+
+  update_published_transform_subscriber_ = node_handle()->subscribe(
+      "update_published_transform", 1000,
+      &Node::HandleUpdatePublishedTransformMessage, this);
 }
 
 bool Node::ValidateTrajectoryOptions(const TrajectoryOptions& options) {
@@ -749,6 +767,10 @@ void Node::HandleLandmarkMessage(
   }
   map_builder_bridge_.sensor_bridge(trajectory_id)
       ->HandleLandmarkMessage(sensor_id, msg);
+}
+
+void Node::HandleUpdatePublishedTransformMessage(const std_msgs::Bool& msg) {
+  update_published_transform = msg.data;
 }
 
 void Node::HandleImuMessage(const int trajectory_id,
