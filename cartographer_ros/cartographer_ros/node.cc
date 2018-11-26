@@ -230,7 +230,7 @@ void Node::PublishLocalTrajectoryData(const ::ros::TimerEvent& timer_event) {
 
         tf2::doTransform(cloud_in_world, cloud_in_sensor_frame, transform);
 
-        scan_matched_point_cloud_publisher_.publish(cloud_in_world);
+        scan_matched_point_cloud_publisher_.publish(cloud_in_sensor_frame);
       }
       extrapolator.AddPose(trajectory_data.local_slam_data->time,
                            trajectory_data.local_slam_data->local_pose);
