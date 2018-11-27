@@ -202,36 +202,9 @@ void Node::PublishLocalTrajectoryData(const ::ros::TimerEvent& timer_event) {
     auto& extrapolator = extrapolators_.at(entry.first);
     // We only publish a point cloud if it has changed. It is not needed at high
     // frequency, and republishing it would be computationally wasteful.
-    if (trajectory_data.local_slam_data->time !=
-        extrapolator.GetLastPoseTime()) {
-      if (scan_matched_point_cloud_publisher_.getNumSubscribers() > 0) {
-        // TODO(gaschler): Consider using other message without time
-        // information.
-        carto::sensor::TimedPointCloud point_cloud;
-        point_cloud.reserve(trajectory_data.local_slam_data->range_data_in_local
-                                .returns.size());
-        for (const cartographer::sensor::RangefinderPoint point :
-             trajectory_data.local_slam_data->range_data_in_local.returns) {
-          point_cloud.push_back(cartographer::sensor::ToTimedRangefinderPoint(
-              point, 0.f /* time */));
-        }
-
-        sensor_msgs::PointCloud2 cloud_in_world = ToPointCloud2Message(
-            carto::common::ToUniversal(trajectory_data.local_slam_data->time),
-            node_options_.map_frame,
-            carto::sensor::TransformTimedPointCloud(
-                point_cloud, trajectory_data.local_to_map.cast<float>()));
-        sensor_msgs::PointCloud2 cloud_in_sensor_frame;
-        geometry_msgs::TransformStamped transform =
-            map_builder_bridge_.tf_buffer_->lookupTransform(
-                trajectory_data.trajectory_options.matched_pointcloud_frame,
-                trajectory_data.trajectory_options.tracking_frame,
-                cloud_in_world.header.stamp, ros::Duration(1.0));
-
-        tf2::doTransform(cloud_in_world, cloud_in_sensor_frame, transform);
-
-        scan_matched_point_cloud_publisher_.publish(cloud_in_sensor_frame);
-      }
+    bool publish_pointcloud =
+        trajectory_data.local_slam_data->time != extrapolator.GetLastPoseTime();
+    if (publish_pointcloud) {
       extrapolator.AddPose(trajectory_data.local_slam_data->time,
                            trajectory_data.local_slam_data->local_pose);
     }
@@ -302,6 +275,38 @@ void Node::PublishLocalTrajectoryData(const ::ros::TimerEvent& timer_event) {
                 ? ToRos(now)
                 : ToRos(trajectory_data.local_slam_data->time);
         tf_broadcaster_.sendTransform(stamped_transform);
+      }
+    }
+    if (publish_pointcloud) {
+      if (scan_matched_point_cloud_publisher_.getNumSubscribers() > 0) {
+        // TODO(gaschler): Consider using other message without time
+        // information.
+        carto::sensor::TimedPointCloud point_cloud;
+        point_cloud.reserve(trajectory_data.local_slam_data->range_data_in_local
+                                .returns.size());
+        for (const cartographer::sensor::RangefinderPoint point :
+             trajectory_data.local_slam_data->range_data_in_local.returns) {
+          point_cloud.push_back(cartographer::sensor::ToTimedRangefinderPoint(
+              point, 0.f /* time */));
+        }
+
+        sensor_msgs::PointCloud2 cloud_in_world = ToPointCloud2Message(
+            carto::common::ToUniversal(trajectory_data.local_slam_data->time),
+            node_options_.map_frame,
+            carto::sensor::TransformTimedPointCloud(
+                point_cloud, trajectory_data.local_to_map.cast<float>()));
+        sensor_msgs::PointCloud2 cloud_in_sensor_frame;
+        try {
+          geometry_msgs::TransformStamped transform =
+              map_builder_bridge_.tf_buffer_->lookupTransform(
+                  trajectory_data.trajectory_options.matched_pointcloud_frame,
+                  node_options_.map_frame, cloud_in_world.header.stamp,
+                  ros::Duration(1.0));
+          tf2::doTransform(cloud_in_world, cloud_in_sensor_frame, transform);
+          scan_matched_point_cloud_publisher_.publish(cloud_in_sensor_frame);
+        } catch (tf2::TransformException ex) {
+          ROS_ERROR("%s", ex.what());
+        }
       }
     }
   }
