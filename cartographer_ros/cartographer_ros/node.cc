@@ -224,10 +224,12 @@ void Node::PublishLocalTrajectoryData(const ::ros::TimerEvent& timer_event) {
         sensor_msgs::PointCloud2 cloud_in_sensor_frame;
         geometry_msgs::TransformStamped transform =
             map_builder_bridge_.tf_buffer_->lookupTransform(
-                trajectory_data.trajectory_options.tracking_frame,
                 trajectory_data.trajectory_options.matched_pointcloud_frame,
+                trajectory_data.trajectory_options.tracking_frame,
                 cloud_in_world.header.stamp, ros::Duration(1.0));
+
         tf2::doTransform(cloud_in_world, cloud_in_sensor_frame, transform);
+
         scan_matched_point_cloud_publisher_.publish(cloud_in_sensor_frame);
       }
       extrapolator.AddPose(trajectory_data.local_slam_data->time,
