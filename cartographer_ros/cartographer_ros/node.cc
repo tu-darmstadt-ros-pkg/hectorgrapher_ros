@@ -125,6 +125,8 @@ Node::Node(
       kGetTrajectoryStatesServiceName, &Node::HandleGetTrajectoryStates, this));
   service_servers_.push_back(node_handle_.advertiseService(
       kReadMetricsServiceName, &Node::HandleReadMetrics, this));
+  service_servers_.push_back(node_handle_.advertiseService(
+      kEnableMapUpdateServiceName, &Node::HandleEnableMapUpdateState, this));
 
   scan_matched_point_cloud_publisher_ =
       node_handle_.advertise<sensor_msgs::PointCloud2>(
@@ -666,6 +668,15 @@ bool Node::HandleFinishTrajectory(
     ::cartographer_ros_msgs::FinishTrajectory::Response& response) {
   absl::MutexLock lock(&mutex_);
   response.status = FinishTrajectoryUnderLock(request.trajectory_id);
+  return true;
+}
+
+bool Node::HandleEnableMapUpdateState(std_srvs::SetBool::Request& request,
+                                      std_srvs::SetBool::Response& response) {
+  absl::MutexLock lock(&mutex_);
+  LOG(INFO) << "Setting UpdateMap to " << bool(request.data);
+  map_builder_bridge_.map_builder_->SetMapUpdateEnabled(bool(request.data));
+  response.success = true;
   return true;
 }
 

@@ -52,6 +52,7 @@
 #include "sensor_msgs/NavSatFix.h"
 #include "sensor_msgs/PointCloud2.h"
 #include "std_msgs/Bool.h"
+#include "std_srvs/SetBool.h"
 #include "tf2_ros/transform_broadcaster.h"
 
 namespace cartographer_ros {
@@ -150,6 +151,8 @@ class Node {
   bool HandleReadMetrics(
       cartographer_ros_msgs::ReadMetrics::Request& request,
       cartographer_ros_msgs::ReadMetrics::Response& response);
+  bool HandleEnableMapUpdateState(std_srvs::SetBool::Request& request,
+                                  std_srvs::SetBool::Response& response);
 
   // Returns the set of SensorIds expected for a trajectory.
   // 'SensorId::id' is the expected ROS topic name.
