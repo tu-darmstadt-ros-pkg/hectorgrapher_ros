@@ -22,6 +22,7 @@
 
 #include "Eigen/Core"
 #include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
 #include "cartographer/common/configuration_file_resolver.h"
 #include "cartographer/common/lua_parameter_dictionary.h"
 #include "cartographer/common/port.h"
@@ -49,20 +50,13 @@
 
 namespace cartographer_ros {
 
+namespace carto = ::cartographer;
+
+using carto::transform::Rigid3d;
+using TrajectoryState =
+    ::cartographer::mapping::PoseGraphInterface::TrajectoryState;
+
 namespace {
-
-cartographer_ros_msgs::SensorTopics DefaultSensorTopics() {
-  cartographer_ros_msgs::SensorTopics topics;
-  topics.laser_scan_topic = kLaserScanTopic;
-  topics.multi_echo_laser_scan_topic = kMultiEchoLaserScanTopic;
-  topics.point_cloud2_topic = kPointCloud2Topic;
-  topics.imu_topic = kImuTopic;
-  topics.odometry_topic = kOdometryTopic;
-  topics.nav_sat_fix_topic = kNavSatFixTopic;
-  topics.landmark_topic = kLandmarkTopic;
-  return topics;
-}
-
 // Subscribes to the 'topic' for 'trajectory_id' using the 'node_handle' and
 // calls 'handler' on the 'node' to handle messages. Returns the subscriber.
 template <typename MessageType>
@@ -80,13 +74,21 @@ template <typename MessageType>
           }));
 }
 
+std::string TrajectoryStateToString(const TrajectoryState trajectory_state) {
+  switch (trajectory_state) {
+    case TrajectoryState::ACTIVE:
+      return "ACTIVE";
+    case TrajectoryState::FINISHED:
+      return "FINISHED";
+    case TrajectoryState::FROZEN:
+      return "FROZEN";
+    case TrajectoryState::DELETED:
+      return "DELETED";
+  }
+  return "";
+}
+
 }  // namespace
-
-namespace carto = ::cartographer;
-
-using carto::transform::Rigid3d;
-using TrajectoryState =
-    ::cartographer::mapping::PoseGraphInterface::TrajectoryState;
 
 Node::Node(
     const NodeOptions& node_options,
@@ -115,6 +117,8 @@ Node::Node(
           kConstraintListTopic, kLatestOnlyPublisherQueueSize);
   service_servers_.push_back(node_handle_.advertiseService(
       kSubmapQueryServiceName, &Node::HandleSubmapQuery, this));
+  service_servers_.push_back(node_handle_.advertiseService(
+      kTrajectoryQueryServiceName, &Node::HandleTrajectoryQuery, this));
   service_servers_.push_back(node_handle_.advertiseService(
       kStartTrajectoryServiceName, &Node::HandleStartTrajectory, this));
   service_servers_.push_back(node_handle_.advertiseService(
@@ -160,6 +164,23 @@ bool Node::HandleSubmapQuery(
     ::cartographer_ros_msgs::SubmapQuery::Response& response) {
   absl::MutexLock lock(&mutex_);
   map_builder_bridge_.HandleSubmapQuery(request, response);
+  return true;
+}
+
+bool Node::HandleTrajectoryQuery(
+    ::cartographer_ros_msgs::TrajectoryQuery::Request& request,
+    ::cartographer_ros_msgs::TrajectoryQuery::Response& response) {
+  absl::MutexLock lock(&mutex_);
+  response.status = TrajectoryStateToStatus(
+      request.trajectory_id,
+      {TrajectoryState::ACTIVE, TrajectoryState::FINISHED,
+       TrajectoryState::FROZEN} /* valid states */);
+  if (response.status.code != cartographer_ros_msgs::StatusCode::OK) {
+    LOG(ERROR) << "Can't query trajectory from pose graph: "
+               << response.status.message;
+    return true;
+  }
+  map_builder_bridge_.HandleTrajectoryQuery(request, response);
   return true;
 }
 
@@ -341,24 +362,21 @@ void Node::PublishConstraintList(
 }
 
 std::set<cartographer::mapping::TrajectoryBuilderInterface::SensorId>
-Node::ComputeExpectedSensorIds(
-    const TrajectoryOptions& options,
-    const cartographer_ros_msgs::SensorTopics& topics) const {
+Node::ComputeExpectedSensorIds(const TrajectoryOptions& options) const {
   using SensorId = cartographer::mapping::TrajectoryBuilderInterface::SensorId;
   using SensorType = SensorId::SensorType;
   std::set<SensorId> expected_topics;
   // Subscribe to all laser scan, multi echo laser scan, and point cloud topics.
+  for (const std::string& topic :
+       ComputeRepeatedTopicNames(kLaserScanTopic, options.num_laser_scans)) {
+    expected_topics.insert(SensorId{SensorType::RANGE, topic});
+  }
   for (const std::string& topic : ComputeRepeatedTopicNames(
-           topics.laser_scan_topic, options.num_laser_scans)) {
+           kMultiEchoLaserScanTopic, options.num_multi_echo_laser_scans)) {
     expected_topics.insert(SensorId{SensorType::RANGE, topic});
   }
   for (const std::string& topic :
-       ComputeRepeatedTopicNames(topics.multi_echo_laser_scan_topic,
-                                 options.num_multi_echo_laser_scans)) {
-    expected_topics.insert(SensorId{SensorType::RANGE, topic});
-  }
-  for (const std::string& topic : ComputeRepeatedTopicNames(
-           topics.point_cloud2_topic, options.num_point_clouds)) {
+       ComputeRepeatedTopicNames(kPointCloud2Topic, options.num_point_clouds)) {
     expected_topics.insert(SensorId{SensorType::RANGE, topic});
   }
   // For 2D SLAM, subscribe to the IMU if we expect it. For 3D SLAM, the IMU is
@@ -367,17 +385,16 @@ Node::ComputeExpectedSensorIds(
       (node_options_.map_builder_options.use_trajectory_builder_2d() &&
        options.trajectory_builder_options.trajectory_builder_2d_options()
            .use_imu_data())) {
-    expected_topics.insert(SensorId{SensorType::IMU, topics.imu_topic});
+    expected_topics.insert(SensorId{SensorType::IMU, kImuTopic});
   }
   // Odometry is optional.
   if (options.use_odometry) {
-    expected_topics.insert(
-        SensorId{SensorType::ODOMETRY, topics.odometry_topic});
+    expected_topics.insert(SensorId{SensorType::ODOMETRY, kOdometryTopic});
   }
   // NavSatFix is optional.
   if (options.use_nav_sat) {
     expected_topics.insert(
-        SensorId{SensorType::FIXED_FRAME_POSE, topics.nav_sat_fix_topic});
+        SensorId{SensorType::FIXED_FRAME_POSE, kNavSatFixTopic});
   }
   // Landmark is optional.
   if (options.use_landmarks) {
@@ -386,15 +403,14 @@ Node::ComputeExpectedSensorIds(
   return expected_topics;
 }
 
-int Node::AddTrajectory(const TrajectoryOptions& options,
-                        const cartographer_ros_msgs::SensorTopics& topics) {
+int Node::AddTrajectory(const TrajectoryOptions& options) {
   const std::set<cartographer::mapping::TrajectoryBuilderInterface::SensorId>
-      expected_sensor_ids = ComputeExpectedSensorIds(options, topics);
+      expected_sensor_ids = ComputeExpectedSensorIds(options);
   const int trajectory_id =
       map_builder_bridge_.AddTrajectory(expected_sensor_ids, options);
   AddExtrapolator(trajectory_id, options);
   AddSensorSamplers(trajectory_id, options);
-  LaunchSubscribers(options, topics, trajectory_id);
+  LaunchSubscribers(options, trajectory_id);
   wall_timers_.push_back(node_handle_.createWallTimer(
       ::ros::WallDuration(kTopicMismatchCheckDelaySec),
       &Node::MaybeWarnAboutTopicMismatch, this, /*oneshot=*/true));
@@ -405,27 +421,25 @@ int Node::AddTrajectory(const TrajectoryOptions& options,
 }
 
 void Node::LaunchSubscribers(const TrajectoryOptions& options,
-                             const cartographer_ros_msgs::SensorTopics& topics,
                              const int trajectory_id) {
-  for (const std::string& topic : ComputeRepeatedTopicNames(
-           topics.laser_scan_topic, options.num_laser_scans)) {
+  for (const std::string& topic :
+       ComputeRepeatedTopicNames(kLaserScanTopic, options.num_laser_scans)) {
     subscribers_[trajectory_id].push_back(
         {SubscribeWithHandler<sensor_msgs::LaserScan>(
              &Node::HandleLaserScanMessage, trajectory_id, topic, &node_handle_,
              this),
          topic});
   }
-  for (const std::string& topic :
-       ComputeRepeatedTopicNames(topics.multi_echo_laser_scan_topic,
-                                 options.num_multi_echo_laser_scans)) {
+  for (const std::string& topic : ComputeRepeatedTopicNames(
+           kMultiEchoLaserScanTopic, options.num_multi_echo_laser_scans)) {
     subscribers_[trajectory_id].push_back(
         {SubscribeWithHandler<sensor_msgs::MultiEchoLaserScan>(
              &Node::HandleMultiEchoLaserScanMessage, trajectory_id, topic,
              &node_handle_, this),
          topic});
   }
-  for (const std::string& topic : ComputeRepeatedTopicNames(
-           topics.point_cloud2_topic, options.num_point_clouds)) {
+  for (const std::string& topic :
+       ComputeRepeatedTopicNames(kPointCloud2Topic, options.num_point_clouds)) {
     subscribers_[trajectory_id].push_back(
         {SubscribeWithHandler<sensor_msgs::PointCloud2>(
              &Node::HandlePointCloud2Message, trajectory_id, topic,
@@ -439,37 +453,33 @@ void Node::LaunchSubscribers(const TrajectoryOptions& options,
       (node_options_.map_builder_options.use_trajectory_builder_2d() &&
        options.trajectory_builder_options.trajectory_builder_2d_options()
            .use_imu_data())) {
-    std::string topic = topics.imu_topic;
     subscribers_[trajectory_id].push_back(
         {SubscribeWithHandler<sensor_msgs::Imu>(&Node::HandleImuMessage,
-                                                trajectory_id, topic,
+                                                trajectory_id, kImuTopic,
                                                 &node_handle_, this),
-         topic});
+         kImuTopic});
   }
 
   if (options.use_odometry) {
-    std::string topic = topics.odometry_topic;
     subscribers_[trajectory_id].push_back(
         {SubscribeWithHandler<nav_msgs::Odometry>(&Node::HandleOdometryMessage,
-                                                  trajectory_id, topic,
+                                                  trajectory_id, kOdometryTopic,
                                                   &node_handle_, this),
-         topic});
+         kOdometryTopic});
   }
   if (options.use_nav_sat) {
-    std::string topic = topics.nav_sat_fix_topic;
     subscribers_[trajectory_id].push_back(
         {SubscribeWithHandler<sensor_msgs::NavSatFix>(
-             &Node::HandleNavSatFixMessage, trajectory_id, topic, &node_handle_,
-             this),
-         topic});
+             &Node::HandleNavSatFixMessage, trajectory_id, kNavSatFixTopic,
+             &node_handle_, this),
+         kNavSatFixTopic});
   }
   if (options.use_landmarks) {
-    std::string topic = topics.landmark_topic;
     subscribers_[trajectory_id].push_back(
         {SubscribeWithHandler<cartographer_ros_msgs::LandmarkList>(
-             &Node::HandleLandmarkMessage, trajectory_id, topic, &node_handle_,
-             this),
-         topic});
+             &Node::HandleLandmarkMessage, trajectory_id, kLandmarkTopic,
+             &node_handle_, this),
+         kLandmarkTopic});
   }
 
   update_published_transform_subscriber_ = node_handle()->subscribe(
@@ -489,10 +499,8 @@ bool Node::ValidateTrajectoryOptions(const TrajectoryOptions& options) {
   return false;
 }
 
-bool Node::ValidateTopicNames(
-    const ::cartographer_ros_msgs::SensorTopics& topics,
-    const TrajectoryOptions& options) {
-  for (const auto& sensor_id : ComputeExpectedSensorIds(options, topics)) {
+bool Node::ValidateTopicNames(const TrajectoryOptions& options) {
+  for (const auto& sensor_id : ComputeExpectedSensorIds(options)) {
     const std::string& topic = sensor_id.id;
     if (subscribed_topics_.count(topic) > 0) {
       LOG(ERROR) << "Topic name [" << topic << "] is already used.";
@@ -502,50 +510,45 @@ bool Node::ValidateTopicNames(
   return true;
 }
 
+cartographer_ros_msgs::StatusResponse Node::TrajectoryStateToStatus(
+    const int trajectory_id, const std::set<TrajectoryState>& valid_states) {
+  const auto trajectory_states = map_builder_bridge_.GetTrajectoryStates();
+  cartographer_ros_msgs::StatusResponse status_response;
+
+  const auto it = trajectory_states.find(trajectory_id);
+  if (it == trajectory_states.end()) {
+    status_response.message =
+        absl::StrCat("Trajectory ", trajectory_id, " doesn't exist.");
+    status_response.code = cartographer_ros_msgs::StatusCode::NOT_FOUND;
+    return status_response;
+  }
+
+  status_response.message =
+      absl::StrCat("Trajectory ", trajectory_id, " is in '",
+                   TrajectoryStateToString(it->second), "' state.");
+  status_response.code =
+      valid_states.count(it->second)
+          ? cartographer_ros_msgs::StatusCode::OK
+          : cartographer_ros_msgs::StatusCode::INVALID_ARGUMENT;
+  return status_response;
+}
+
 cartographer_ros_msgs::StatusResponse Node::FinishTrajectoryUnderLock(
     const int trajectory_id) {
-  auto trajectory_states = map_builder_bridge_.GetTrajectoryStates();
-
   cartographer_ros_msgs::StatusResponse status_response;
   if (trajectories_scheduled_for_finish_.count(trajectory_id)) {
-    const std::string message = "Trajectory " + std::to_string(trajectory_id) +
-                                " already pending to finish.";
+    status_response.message = absl::StrCat("Trajectory ", trajectory_id,
+                                           " already pending to finish.");
     status_response.code = cartographer_ros_msgs::StatusCode::OK;
-    status_response.message = message;
-    LOG(INFO) << message;
+    LOG(INFO) << status_response.message;
     return status_response;
   }
 
   // First, check if we can actually finish the trajectory.
-  if (!(trajectory_states.count(trajectory_id))) {
-    const std::string error =
-        "Trajectory " + std::to_string(trajectory_id) + " doesn't exist.";
-    LOG(ERROR) << error;
-    status_response.code = cartographer_ros_msgs::StatusCode::NOT_FOUND;
-    status_response.message = error;
-    return status_response;
-  } else if (trajectory_states.at(trajectory_id) == TrajectoryState::FROZEN) {
-    const std::string error =
-        "Trajectory " + std::to_string(trajectory_id) + " is frozen.";
-    LOG(ERROR) << error;
-    status_response.code = cartographer_ros_msgs::StatusCode::INVALID_ARGUMENT;
-    status_response.message = error;
-    return status_response;
-  } else if (trajectory_states.at(trajectory_id) == TrajectoryState::FINISHED) {
-    const std::string error = "Trajectory " + std::to_string(trajectory_id) +
-                              " has already been finished.";
-    LOG(ERROR) << error;
-    status_response.code =
-        cartographer_ros_msgs::StatusCode::RESOURCE_EXHAUSTED;
-    status_response.message = error;
-    return status_response;
-  } else if (trajectory_states.at(trajectory_id) == TrajectoryState::DELETED) {
-    const std::string error =
-        "Trajectory " + std::to_string(trajectory_id) + " has been deleted.";
-    LOG(ERROR) << error;
-    status_response.code =
-        cartographer_ros_msgs::StatusCode::RESOURCE_EXHAUSTED;
-    status_response.message = error;
+  status_response = TrajectoryStateToStatus(
+      trajectory_id, {TrajectoryState::ACTIVE} /* valid states */);
+  if (status_response.code != cartographer_ros_msgs::StatusCode::OK) {
+    LOG(ERROR) << "Can't finish trajectory: " << status_response.message;
     return status_response;
   }
 
@@ -561,33 +564,65 @@ cartographer_ros_msgs::StatusResponse Node::FinishTrajectoryUnderLock(
   }
   map_builder_bridge_.FinishTrajectory(trajectory_id);
   trajectories_scheduled_for_finish_.emplace(trajectory_id);
-  const std::string message =
-      "Finished trajectory " + std::to_string(trajectory_id) + ".";
+  status_response.message =
+      absl::StrCat("Finished trajectory ", trajectory_id, ".");
   status_response.code = cartographer_ros_msgs::StatusCode::OK;
-  status_response.message = message;
   return status_response;
 }
 
 bool Node::HandleStartTrajectory(
     ::cartographer_ros_msgs::StartTrajectory::Request& request,
     ::cartographer_ros_msgs::StartTrajectory::Response& response) {
-  absl::MutexLock lock(&mutex_);
-  TrajectoryOptions options;
-  if (!FromRosMessage(request.options, &options) ||
-      !ValidateTrajectoryOptions(options)) {
-    const std::string error = "Invalid trajectory options.";
-    LOG(ERROR) << error;
+  TrajectoryOptions trajectory_options;
+  std::tie(std::ignore, trajectory_options) = LoadOptions(
+      request.configuration_directory, request.configuration_basename);
+
+  if (request.use_initial_pose) {
+    const auto pose = ToRigid3d(request.initial_pose);
+    if (!pose.IsValid()) {
+      response.status.message =
+          "Invalid pose argument. Orientation quaternion must be normalized.";
+      LOG(ERROR) << response.status.message;
+      response.status.code =
+          cartographer_ros_msgs::StatusCode::INVALID_ARGUMENT;
+      return true;
+    }
+
+    // Check if the requested trajectory for the relative initial pose exists.
+    response.status = TrajectoryStateToStatus(
+        request.relative_to_trajectory_id,
+        {TrajectoryState::ACTIVE, TrajectoryState::FROZEN,
+         TrajectoryState::FINISHED} /* valid states */);
+    if (response.status.code != cartographer_ros_msgs::StatusCode::OK) {
+      LOG(ERROR) << "Can't start a trajectory with initial pose: "
+                 << response.status.message;
+      return true;
+    }
+
+    ::cartographer::mapping::proto::InitialTrajectoryPose
+        initial_trajectory_pose;
+    initial_trajectory_pose.set_to_trajectory_id(
+        request.relative_to_trajectory_id);
+    *initial_trajectory_pose.mutable_relative_pose() =
+        cartographer::transform::ToProto(pose);
+    initial_trajectory_pose.set_timestamp(cartographer::common::ToUniversal(
+        ::cartographer_ros::FromRos(ros::Time(0))));
+    *trajectory_options.trajectory_builder_options
+         .mutable_initial_trajectory_pose() = initial_trajectory_pose;
+  }
+
+  if (!ValidateTrajectoryOptions(trajectory_options)) {
+    response.status.message = "Invalid trajectory options.";
+    LOG(ERROR) << response.status.message;
     response.status.code = cartographer_ros_msgs::StatusCode::INVALID_ARGUMENT;
-    response.status.message = error;
-  } else if (!ValidateTopicNames(request.topics, options)) {
-    const std::string error = "Invalid topics.";
-    LOG(ERROR) << error;
+  } else if (!ValidateTopicNames(trajectory_options)) {
+    response.status.message = "Topics are already used by another trajectory.";
+    LOG(ERROR) << response.status.message;
     response.status.code = cartographer_ros_msgs::StatusCode::INVALID_ARGUMENT;
-    response.status.message = error;
   } else {
-    response.trajectory_id = AddTrajectory(options, request.topics);
-    response.status.code = cartographer_ros_msgs::StatusCode::OK;
     response.status.message = "Success.";
+    response.trajectory_id = AddTrajectory(trajectory_options);
+    response.status.code = cartographer_ros_msgs::StatusCode::OK;
   }
   return true;
 }
@@ -595,7 +630,7 @@ bool Node::HandleStartTrajectory(
 void Node::StartTrajectoryWithDefaultTopics(const TrajectoryOptions& options) {
   absl::MutexLock lock(&mutex_);
   CHECK(ValidateTrajectoryOptions(options));
-  AddTrajectory(options, DefaultSensorTopics());
+  AddTrajectory(options);
 }
 
 std::vector<
@@ -610,8 +645,7 @@ Node::ComputeDefaultSensorIdsForMultipleBags(
       prefix = "bag_" + std::to_string(i + 1) + "_";
     }
     std::set<SensorId> unique_sensor_ids;
-    for (const auto& sensor_id :
-         ComputeExpectedSensorIds(bags_options.at(i), DefaultSensorTopics())) {
+    for (const auto& sensor_id : ComputeExpectedSensorIds(bags_options.at(i))) {
       unique_sensor_ids.insert(SensorId{sensor_id.type, prefix + sensor_id.id});
     }
     bags_sensor_ids.push_back(unique_sensor_ids);
@@ -687,10 +721,12 @@ bool Node::HandleWriteState(
   if (map_builder_bridge_.SerializeState(request.filename,
                                          request.include_unfinished_submaps)) {
     response.status.code = cartographer_ros_msgs::StatusCode::OK;
-    response.status.message = "State written to '" + request.filename + "'.";
+    response.status.message =
+        absl::StrCat("State written to '", request.filename, "'.");
   } else {
     response.status.code = cartographer_ros_msgs::StatusCode::INVALID_ARGUMENT;
-    response.status.message = "Failed to write '" + request.filename + "'.";
+    response.status.message =
+        absl::StrCat("Failed to write '", request.filename, "'.");
   }
   return true;
 }

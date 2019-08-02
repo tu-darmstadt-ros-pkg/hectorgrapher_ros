@@ -1,4 +1,6 @@
-# Copyright 2016 The Cartographer Authors
+#!/bin/sh
+
+# Copyright 2018 The Cartographer Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-string laser_scan_topic
-string multi_echo_laser_scan_topic
-string point_cloud2_topic
-string imu_topic
-string odometry_topic
-string nav_sat_fix_topic
-string landmark_topic
+set -o errexit
+set -o verbose
+
+. /opt/ros/${ROS_DISTRO}/setup.sh
+
+cd catkin_ws/src
+
+# Call 'status' as a workaround for https://github.com/vcstools/wstool/issues/77
+wstool status
+wstool update

@@ -26,25 +26,19 @@ find_package(catkin REQUIRED COMPONENTS message_generation ${PACKAGE_DEPENDENCIE
 add_message_files(
   DIRECTORY msg
   FILES
+    BagfileProgress.msg
+    HistogramBucket.msg
     LandmarkEntry.msg
     LandmarkList.msg
-    SensorTopics.msg
+    MetricFamily.msg
+    MetricLabel.msg
+    Metric.msg
     StatusCode.msg
     StatusResponse.msg
     SubmapEntry.msg
     SubmapList.msg
     SubmapTexture.msg
-    TrajectoryOptions.msg
     TrajectoryStates.msg
-)
-
-add_message_files(
-  DIRECTORY msg/metrics
-  FILES
-    HistogramBucket.msg
-    MetricFamily.msg
-    MetricLabel.msg
-    Metric.msg
 )
 
 add_service_files(
@@ -55,6 +49,7 @@ add_service_files(
     ReadMetrics.srv
     StartTrajectory.srv
     SubmapQuery.srv
+    TrajectoryQuery.srv
     WriteState.srv
 )
 

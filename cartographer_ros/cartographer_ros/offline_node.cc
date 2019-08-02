@@ -18,13 +18,16 @@
 
 #include <errno.h>
 #include <string.h>
+#ifndef WIN32
 #include <sys/resource.h>
+#endif
 #include <time.h>
+
 #include <chrono>
 
+#include "absl/strings/str_split.h"
 #include "cartographer_ros/node.h"
 #include "cartographer_ros/playable_bag.h"
-#include "cartographer_ros/split_string.h"
 #include "cartographer_ros/urdf_reader.h"
 #include "gflags/gflags.h"
 #include "ros/callback_queue.h"
@@ -60,6 +63,11 @@ DEFINE_string(load_state_filename, "",
               "a saved SLAM state.");
 DEFINE_bool(load_frozen_state, true,
             "Load the saved state as frozen (non-optimized) trajectories.");
+DEFINE_string(save_state_filename, "",
+              "Explicit name of the file to which the serialized state will be "
+              "written before shutdown. If left empty, the filename will be "
+              "inferred from the first bagfile's name as: "
+              "<bag_filenames[0]>.pbstream");
 DEFINE_bool(keep_running, false,
             "Keep running the offline node after all messages from the bag "
             "have been processed.");
@@ -86,11 +94,11 @@ void RunOfflineNode(const MapBuilderFactory& map_builder_factory) {
       << "-configuration_basenames is missing.";
   CHECK(!(FLAGS_bag_filenames.empty() && FLAGS_load_state_filename.empty()))
       << "-bag_filenames and -load_state_filename cannot both be unspecified.";
-  const auto bag_filenames =
-      cartographer_ros::SplitString(FLAGS_bag_filenames, ',');
+  const std::vector<std::string> bag_filenames =
+      absl::StrSplit(FLAGS_bag_filenames, ',', absl::SkipEmpty());
   cartographer_ros::NodeOptions node_options;
-  const auto configuration_basenames =
-      cartographer_ros::SplitString(FLAGS_configuration_basenames, ',');
+  const std::vector<std::string> configuration_basenames =
+      absl::StrSplit(FLAGS_configuration_basenames, ',', absl::SkipEmpty());
   std::vector<TrajectoryOptions> bag_trajectory_options(1);
   std::tie(node_options, bag_trajectory_options.at(0)) =
       LoadOptions(FLAGS_configuration_directory, configuration_basenames.at(0));
@@ -122,8 +130,9 @@ void RunOfflineNode(const MapBuilderFactory& map_builder_factory) {
   tf2_ros::Buffer tf_buffer;
 
   std::vector<geometry_msgs::TransformStamped> urdf_transforms;
-  for (const std::string& urdf_filename :
-       cartographer_ros::SplitString(FLAGS_urdf_filenames, ',')) {
+  const std::vector<std::string> urdf_filenames =
+      absl::StrSplit(FLAGS_urdf_filenames, ',', absl::SkipEmpty());
+  for (const auto& urdf_filename : urdf_filenames) {
     const auto current_urdf_transforms =
         ReadStaticTransformsFromUrdf(urdf_filename, &tf_buffer);
     urdf_transforms.insert(urdf_transforms.end(),
@@ -367,15 +376,19 @@ void RunOfflineNode(const MapBuilderFactory& map_builder_factory) {
   LOG(INFO) << "Peak memory usage: " << usage.ru_maxrss << " KiB";
 #endif
 
-  if (::ros::ok() && bag_filenames.size() > 0) {
-    const std::string output_filename = bag_filenames.front();
-    const std::string suffix = ".pbstream";
-    const std::string state_output_filename = output_filename + suffix;
+  // Serialize unless we have neither a bagfile nor an explicit state filename.
+  if (::ros::ok() &&
+      !(bag_filenames.empty() && FLAGS_save_state_filename.empty())) {
+    const std::string state_output_filename =
+        FLAGS_save_state_filename.empty()
+            ? absl::StrCat(bag_filenames.front(), ".pbstream")
+            : FLAGS_save_state_filename;
     LOG(INFO) << "Writing state to '" << state_output_filename << "'...";
     node.SerializeState(state_output_filename,
                         true /* include_unfinished_submaps */);
   }
   if (FLAGS_keep_running) {
+    LOG(INFO) << "Finished processing and waiting for shutdown.";
     ::ros::waitForShutdown();
   }
 }
