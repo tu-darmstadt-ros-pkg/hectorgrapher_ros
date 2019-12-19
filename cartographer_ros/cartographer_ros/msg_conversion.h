@@ -38,6 +38,10 @@ sensor_msgs::PointCloud2 ToPointCloud2Message(
     int64_t timestamp, const std::string& frame_id,
     const ::cartographer::sensor::TimedPointCloud& point_cloud);
 
+sensor_msgs::PointCloud2 ToPointCloud2Message(
+    int64_t timestamp, const std::string& frame_id,
+    const std::vector<Eigen::Array4f>& point_cloud);
+
 geometry_msgs::Transform ToGeometryMsgTransform(
     const ::cartographer::transform::Rigid3d& rigid3d);
 

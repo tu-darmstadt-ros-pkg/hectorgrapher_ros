@@ -114,6 +114,39 @@ sensor_msgs::PointCloud2 PreparePointCloud2Message(const int64_t timestamp,
   return msg;
 }
 
+sensor_msgs::PointCloud2 PreparePointCloud2MessageWithIntensity(
+    const int64_t timestamp, const std::string& frame_id,
+    const int num_points) {
+  sensor_msgs::PointCloud2 msg;
+  msg.header.stamp = ToRos(::cartographer::common::FromUniversal(timestamp));
+  msg.header.frame_id = frame_id;
+  msg.height = 1;
+  msg.width = num_points;
+  msg.fields.resize(4);
+  msg.fields[0].name = "x";
+  msg.fields[0].offset = 0;
+  msg.fields[0].datatype = sensor_msgs::PointField::FLOAT32;
+  msg.fields[0].count = 1;
+  msg.fields[1].name = "y";
+  msg.fields[1].offset = 4;
+  msg.fields[1].datatype = sensor_msgs::PointField::FLOAT32;
+  msg.fields[1].count = 1;
+  msg.fields[2].name = "z";
+  msg.fields[2].offset = 8;
+  msg.fields[2].datatype = sensor_msgs::PointField::FLOAT32;
+  msg.fields[2].count = 1;
+  msg.fields[3].name = "intensity";
+  msg.fields[3].offset = 12;
+  msg.fields[3].datatype = sensor_msgs::PointField::FLOAT32;
+  msg.fields[3].count = 1;
+  msg.is_bigendian = false;
+  msg.point_step = 16;
+  msg.row_step = 16 * msg.width;
+  msg.is_dense = true;
+  msg.data.resize(16 * num_points);
+  return msg;
+}
+
 // For sensor_msgs::LaserScan.
 bool HasEcho(float) { return true; }
 
@@ -196,6 +229,20 @@ sensor_msgs::PointCloud2 ToPointCloud2Message(
     stream.next(point.position.y());
     stream.next(point.position.z());
     stream.next(kPointCloudComponentFourMagic);
+  }
+  return msg;
+}
+sensor_msgs::PointCloud2 ToPointCloud2Message(
+    const int64_t timestamp, const std::string& frame_id,
+    const std::vector<Eigen::Array4f>& point_cloud_with_intensities) {
+  auto msg = PreparePointCloud2MessageWithIntensity(
+      timestamp, frame_id, point_cloud_with_intensities.size());
+  ::ros::serialization::OStream stream(msg.data.data(), msg.data.size());
+  for (const Eigen::Array4f& point : point_cloud_with_intensities) {
+    stream.next(point[0]);
+    stream.next(point[1]);
+    stream.next(point[2]);
+    stream.next(point[3]);
   }
   return msg;
 }

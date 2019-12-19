@@ -15,12 +15,16 @@
  */
 
 #include "cartographer_ros/map_builder_bridge.h"
+#include <cartographer/common/time.h>
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "cartographer/io/color.h"
 #include "cartographer/io/proto_stream.h"
+#include "cartographer/mapping/3d/submap_3d.h"
+#include "cartographer/mapping/id.h"
 #include "cartographer/mapping/pose_graph.h"
+#include "cartographer/mapping/pose_graph_interface.h"
 #include "cartographer_ros/msg_conversion.h"
 #include "cartographer_ros/time_conversion.h"
 #include "cartographer_ros_msgs/StatusCode.h"
@@ -518,6 +522,39 @@ visualization_msgs::MarkerArray MapBuilderBridge::GetConstraintList() {
   constraint_list.markers.push_back(constraint_inter_diff_trajectory_marker);
   constraint_list.markers.push_back(residual_inter_diff_trajectory_marker);
   return constraint_list;
+}
+
+sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
+  ::cartographer::mapping::MapById<
+      ::cartographer::mapping::SubmapId,
+      ::cartographer::mapping::PoseGraphInterface::SubmapData>
+      data = map_builder_->pose_graph()->GetAllSubmapData();
+  sensor_msgs::PointCloud2 msg;
+  if (data.size() > 0) {
+    const ::cartographer::mapping::Submap3D* submap3d =
+        static_cast<const ::cartographer::mapping::Submap3D*>(
+            data.begin()->data.submap.get());
+    const ::cartographer::mapping::HybridGridTSDF* tsdf =
+        static_cast<const ::cartographer::mapping::HybridGridTSDF*>(
+            &submap3d->high_resolution_hybrid_grid());
+    std::vector<Eigen::Array4f> cells;
+    for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf);
+         !it.Done(); it.Next()) {
+      const ::cartographer::mapping::TSDFVoxel voxel = it.GetValue();
+      const float tsd = tsdf->ValueConverter().ValueToTSD(voxel.discrete_tsd);
+      const Eigen::Vector3f cell_center_submap =
+          tsdf->GetCenterOfCell(it.GetCellIndex());
+      const Eigen::Vector3f cell_center_global =
+          submap3d->local_pose().cast<float>() * cell_center_submap;
+      cells.emplace_back(cell_center_submap.x(), cell_center_submap.y(),
+                         cell_center_submap.z(), tsd);
+    }
+    msg = ToPointCloud2Message(
+        ::cartographer::common::ToUniversal(FromRos(::ros::Time::now())),
+        "world", cells);
+  }
+
+  return msg;
 }
 
 SensorBridge* MapBuilderBridge::sensor_bridge(const int trajectory_id) {

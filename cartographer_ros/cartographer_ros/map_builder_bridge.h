@@ -100,6 +100,8 @@ class MapBuilderBridge {
   visualization_msgs::MarkerArray GetLandmarkPosesList();
   visualization_msgs::MarkerArray GetConstraintList();
 
+  sensor_msgs::PointCloud2 GetTSDF();
+
   SensorBridge* sensor_bridge(int trajectory_id);
   std::unique_ptr<cartographer::mapping::MapBuilderInterface> map_builder_;
   tf2_ros::Buffer* const tf_buffer_;

@@ -131,11 +131,11 @@ Node::Node(
       kReadMetricsServiceName, &Node::HandleReadMetrics, this));
   service_servers_.push_back(node_handle_.advertiseService(
       kEnableMapUpdateServiceName, &Node::HandleEnableMapUpdateState, this));
-
+  tsdf_map_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>(
+      kTSDFTopic, kLatestOnlyPublisherQueueSize);
   scan_matched_point_cloud_publisher_ =
       node_handle_.advertise<sensor_msgs::PointCloud2>(
           kScanMatchedPointCloudTopic, kLatestOnlyPublisherQueueSize);
-
   wall_timers_.push_back(node_handle_.createWallTimer(
       ::ros::WallDuration(node_options_.submap_publish_period_sec),
       &Node::PublishSubmapList, this));
@@ -153,6 +153,8 @@ Node::Node(
   wall_timers_.push_back(node_handle_.createWallTimer(
       ::ros::WallDuration(kConstraintPublishPeriodSec),
       &Node::PublishConstraintList, this));
+  wall_timers_.push_back(node_handle_.createWallTimer(
+      ::ros::WallDuration(kTSDFPublishPeriodSec), &Node::PublishTSDF, this));
 }
 
 Node::~Node() { FinishAllTrajectories(); }
@@ -358,6 +360,13 @@ void Node::PublishConstraintList(
   if (constraint_list_publisher_.getNumSubscribers() > 0) {
     absl::MutexLock lock(&mutex_);
     constraint_list_publisher_.publish(map_builder_bridge_.GetConstraintList());
+  }
+}
+
+void Node::PublishTSDF(const ::ros::WallTimerEvent& unused_timer_event) {
+  if (tsdf_map_publisher_.getNumSubscribers() > 0) {
+    absl::MutexLock lock(&mutex_);
+    tsdf_map_publisher_.publish(map_builder_bridge_.GetTSDF());
   }
 }
 
