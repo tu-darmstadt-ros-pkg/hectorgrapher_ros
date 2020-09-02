@@ -16,18 +16,19 @@ include "transform.lua"
 
 options = {
   tracking_frame = "base_link",
+  filter_pointcloud2_topic = "/colored_cloud",
   pipeline = {
     {
       action = "min_max_range_filter",
-      min_range = 15.,
+      min_range = 1.,
       max_range = 60.,
     },
     {
       action = "write_ply",
-      aggregate = 300,
-      filename = "result_aggregate_300_poisson_9_trim_8_filter15-60.ply",
-      poisson_depth = 9,
-      trim_surface = 8,
+      aggregate = 25,
+      filename = "result_aggregate_25_poisson_10_trim_10_filter1-60.ply",
+      poisson_depth = 0,
+      trim_surface = 10,
     },
   }
 }
