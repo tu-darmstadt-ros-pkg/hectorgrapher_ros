@@ -239,7 +239,7 @@ void AssetsWriter::Run(const std::string& configuration_directory,
 
           std::unique_ptr<carto::io::PointsBatch> points_batch;
           if (delayed_message.isType<sensor_msgs::PointCloud2>()) {
-            if(pointcloud2_topic.empty()) {
+            if(pointcloud2_topic != "") {
               // if pointcloud2_topic was specified only handle messages for that topic
               if(delayed_message.getTopic() == pointcloud2_topic) {
                 points_batch = HandleMessage(
