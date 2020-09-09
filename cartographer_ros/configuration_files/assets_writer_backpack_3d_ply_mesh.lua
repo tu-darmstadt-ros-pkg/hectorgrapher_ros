@@ -24,9 +24,16 @@ options = {
       max_range = 60.,
     },
     {
+      action = "follower_filter",
+      yaw_range = 20,
+      follow_distance = 3000,
+      min_height = -0.5,
+      max_height = 1.5
+    },
+    {
       action = "write_ply",
       aggregate = 25,
-      filename = "result_aggregate_25_poisson_10_trim_10_filter1-60.ply",
+      filename = "result-follower-filter.ply",
       poisson_depth = 0,
       trim_surface = 10,
     },
