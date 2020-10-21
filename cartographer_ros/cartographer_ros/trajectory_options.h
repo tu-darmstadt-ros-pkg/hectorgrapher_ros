@@ -37,6 +37,7 @@ struct TrajectoryOptions {
   bool use_nav_sat;
   bool use_landmarks;
   bool publish_frame_projected_to_2d;
+  bool handle_scan_as_structured_cloud;
   int num_laser_scans;
   int num_multi_echo_laser_scans;
   int num_subdivisions_per_laser_scan;

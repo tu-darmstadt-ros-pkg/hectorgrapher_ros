@@ -66,6 +66,8 @@ TrajectoryOptions CreateTrajectoryOptions(
   options.num_subdivisions_per_laser_scan =
       lua_parameter_dictionary->GetNonNegativeInt(
           "num_subdivisions_per_laser_scan");
+  options.handle_scan_as_structured_cloud =
+      lua_parameter_dictionary->GetBool("handle_scan_as_structured_cloud");
   options.num_point_clouds =
       lua_parameter_dictionary->GetNonNegativeInt("num_point_clouds");
   options.rangefinder_sampling_ratio =

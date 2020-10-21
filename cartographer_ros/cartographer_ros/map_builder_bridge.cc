@@ -144,6 +144,7 @@ int MapBuilderBridge::AddTrajectory(
   sensor_bridges_[trajectory_id] = absl::make_unique<SensorBridge>(
       trajectory_options.num_subdivisions_per_laser_scan,
       trajectory_options.tracking_frame,
+      trajectory_options.handle_scan_as_structured_cloud,
       node_options_.lookup_transform_timeout_sec, tf_buffer_,
       map_builder_->GetTrajectoryBuilder(trajectory_id));
   auto emplace_result =

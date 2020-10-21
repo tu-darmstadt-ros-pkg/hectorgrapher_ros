@@ -42,9 +42,11 @@ const std::string& CheckNoLeadingSlash(const std::string& frame_id) {
 SensorBridge::SensorBridge(
     const int num_subdivisions_per_laser_scan,
     const std::string& tracking_frame,
+    const bool handle_scan_as_structured_cloud,
     const double lookup_transform_timeout_sec, tf2_ros::Buffer* const tf_buffer,
     carto::mapping::TrajectoryBuilderInterface* const trajectory_builder)
     : num_subdivisions_per_laser_scan_(num_subdivisions_per_laser_scan),
+      handle_scan_as_structured_cloud_(handle_scan_as_structured_cloud),
       tf_bridge_(tracking_frame, lookup_transform_timeout_sec, tf_buffer),
       trajectory_builder_(trajectory_builder) {}
 
@@ -193,7 +195,11 @@ void SensorBridge::HandlePointCloud2Message(
   } else {
     last_range_data_time = FromRos(msg->header.stamp);
   }
-  std::tie(point_cloud, time) = ToPointCloudWithIntensities(*msg);
+  if (handle_scan_as_structured_cloud_) {
+    std::tie(point_cloud, time) = ToStructuredPointCloudWithIntensities(*msg);
+  } else {
+    std::tie(point_cloud, time) = ToPointCloudWithIntensities(*msg);
+  }
   HandleRangefinder(sensor_id, time, msg->header.frame_id, point_cloud.points);
 }
 
@@ -244,9 +250,10 @@ void SensorBridge::HandleLaserScan(
 void SensorBridge::HandleRangefinder(
     const std::string& sensor_id, const carto::common::Time time,
     const std::string& frame_id, const carto::sensor::TimedPointCloud& ranges) {
-  if (!ranges.empty()) {
-    CHECK_LE(ranges.back().time, 0.f);
+  if (ranges.empty()) {
+    return;
   }
+  CHECK_LE(ranges.back().time, 0.f);
   const auto sensor_to_tracking =
       tf_bridge_.LookupToTracking(time, CheckNoLeadingSlash(frame_id));
   if (sensor_to_tracking != nullptr) {

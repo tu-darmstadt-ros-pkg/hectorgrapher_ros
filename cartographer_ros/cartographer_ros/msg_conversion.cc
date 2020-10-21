@@ -18,6 +18,8 @@
 
 #include <cmath>
 
+#include <fstream>
+#include <iostream>
 #include "cartographer/common/math.h"
 #include "cartographer/common/port.h"
 #include "cartographer/common/time.h"
@@ -60,6 +62,13 @@ struct PointXYZIT {
   float unused_padding[2];
 };
 
+struct PointXYZIR {
+  PCL_ADD_POINT4D;
+  float intensity;
+  uint16_t ring;
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
+
 }  // namespace
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
@@ -69,6 +78,10 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
     PointXYZIT,
     (float, x, x)(float, y, y)(float, z, z)(float, intensity,
                                             intensity)(float, time, time))
+POINT_CLOUD_REGISTER_POINT_STRUCT(
+    PointXYZIR,
+    (float, x, x)(float, y, y)(float, z, z)(float, intensity,
+                                            intensity)(uint16_t, ring, ring))
 
 namespace cartographer_ros {
 namespace {
@@ -261,6 +274,113 @@ ToPointCloudWithIntensities(const sensor_msgs::MultiEchoLaserScan& msg) {
 
 std::tuple<::cartographer::sensor::PointCloudWithIntensities,
            ::cartographer::common::Time>
+ToStructuredPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
+  bool has_rings = PointCloud2HasField(msg, "ring");
+  CHECK(has_rings)<< "ring field in PointCloud2 message missing - Disable handle_scan_as_structured_cloud or "
+                     "check your range sensor driver settings.";
+  bool has_intensities = PointCloud2HasField(msg, "intensity");
+
+  // Based on VLP16, TODO(kdaun) make configureable
+  const int NUM_ROWS = 16;
+  const int NUM_POINTS_PER_LINE = 1800;
+  const int NUM_POINTS = NUM_ROWS * NUM_POINTS_PER_LINE;
+  pcl::PointCloud<PointXYZIR> input_cloud;
+  pcl::fromROSMsg(msg, input_cloud);
+  PointCloudWithIntensities point_cloud;
+  point_cloud.points.resize(NUM_POINTS, {Eigen::Vector3f{0.f, 0.f, 0.f}, 0.f});
+  point_cloud.intensities.resize(NUM_ROWS * NUM_POINTS_PER_LINE, 0.f);
+  for (int i = 0; i < input_cloud.points.size(); ++i) {
+    PointXYZIR point;
+    point.x = input_cloud.points[i].x;
+    point.y = input_cloud.points[i].y;
+    point.z = input_cloud.points[i].z;
+    point.intensity = has_intensities ? input_cloud.points[i].intensity : 0.f;
+    int row_idx = -1;
+
+    row_idx = input_cloud.points[i].ring;
+    if (row_idx < 0 || row_idx >= NUM_ROWS) continue;
+
+    float horizon_angle = float(std::atan2(point.y, point.x) * 180.0 / M_PI);
+
+    float ang_res_x = 360.f / float(NUM_POINTS_PER_LINE);
+    int column_idx = -int(round((horizon_angle - 90.0) / ang_res_x)) +
+                    NUM_POINTS_PER_LINE / 2;
+    if (column_idx >= NUM_POINTS_PER_LINE) column_idx -= NUM_POINTS_PER_LINE;
+
+    if (column_idx < 0 || column_idx >= NUM_POINTS_PER_LINE) continue;
+    int index = column_idx + row_idx * NUM_POINTS_PER_LINE;
+
+    point_cloud.points[index] = {Eigen::Vector3f{point.x, point.y, point.z},
+                                 0.f};
+    point_cloud.intensities[index] = 1.0f;
+  }
+  // Debug code for structure-based pointcloud triangulation.
+//      std::vector<Eigen::Vector3i> triangles;
+//      for(int triangle_idx=0; triangle_idx< NUM_POINTS_PER_LINE * (NUM_ROWS
+//      - 1) -1 ; ++triangle_idx) {
+//        int i0 = triangle_idx;
+//        int i1 = triangle_idx + 1;
+//        int i2 = triangle_idx + NUM_POINTS_PER_LINE;
+//        int i3 = triangle_idx + NUM_POINTS_PER_LINE+1;
+//        Eigen::Vector3f p0 = point_cloud.points[i0].position;
+//        Eigen::Vector3f p1 = point_cloud.points[i1].position;
+//        Eigen::Vector3f p2 = point_cloud.points[i2].position;
+//        Eigen::Vector3f p3 = point_cloud.points[i3].position;
+//        float r0 = p0.norm();
+//        float r1 = p1.norm();
+//        float r2 = p2.norm();
+//        float r3 = p3.norm();
+//        float max_range_delta = 1.f;
+//        if(std::abs(r0-r1) < max_range_delta && std::abs(r0-r2) <
+//        max_range_delta && std::abs(r1-r2) < max_range_delta) {
+//          triangles.emplace_back(i0, i2, i1);
+//        }
+//        if(std::abs(r3-r1) < max_range_delta && std::abs(r3-r2) <
+//        max_range_delta && std::abs(r1-r2) < max_range_delta) {
+//          triangles.emplace_back(i1, i2, i3);
+//        }
+//      }
+//
+//      static int idx = 0;
+//      std::ofstream myfile ("example" + std::to_string(idx) +".ply");
+//      ++idx;
+//      myfile << "ply\n";
+//      myfile << "format ascii 1.0\n";
+//      myfile << "comment Created by Cartographer \n";
+//      myfile << "element vertex " << point_cloud.points.size() <<"\n";
+//      myfile << "property float x \n";
+//      myfile << "property float y \n";
+//      myfile << "property float z \n";
+//      myfile << "element face " << triangles.size() <<"\n";
+//      myfile << "property list uchar uint vertex_indices \n";
+//      myfile << "end_header \n";
+//      for(auto& p : point_cloud.points) {
+//        myfile << p.position.x() << " " << p.position.y() << " " << p.position.z() << "\n";
+//      }
+//      for(auto& t : triangles) {
+//        myfile << 3 << " " <<  t[0] << " " << t[1] << " " << t[2] << "\n";
+//
+//      }
+//      myfile.close();
+//      LOG(INFO)<<"wrote file";
+
+  ::cartographer::common::Time timestamp = FromRos(msg.header.stamp);
+  if (!point_cloud.points.empty()) {
+    const double duration = point_cloud.points.back().time;
+    timestamp += cartographer::common::FromSeconds(duration);
+    for (auto& point : point_cloud.points) {
+      point.time -= duration;
+      CHECK_LE(point.time, 0.f)
+          << "Encountered a point with a larger stamp than "
+             "the last point in the cloud.";
+    }
+  }
+
+  return std::make_tuple(point_cloud, timestamp);
+}
+
+std::tuple<::cartographer::sensor::PointCloudWithIntensities,
+           ::cartographer::common::Time>
 ToPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
   PointCloudWithIntensities point_cloud;
   // We check for intensity field here to avoid run-time warnings if we pass in
@@ -311,6 +431,7 @@ ToPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
       }
     }
   }
+
   ::cartographer::common::Time timestamp = FromRos(msg.header.stamp);
   if (!point_cloud.points.empty()) {
     const double duration = point_cloud.points.back().time;
