@@ -547,9 +547,16 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
           tsdf->GetCenterOfCell(it.GetCellIndex());
       const Eigen::Vector3f cell_center_global =
           submap3d->local_pose().cast<float>() * cell_center_submap;
-      cells.emplace_back(cell_center_submap.x(), cell_center_submap.y(),
-                         cell_center_submap.z(), tsd);
+      if ((std::abs(cell_center_submap.z() - 1.0f) < 0.04) ||
+          (std::abs(cell_center_submap.x()) < 0.04) ||
+          (std::abs(cell_center_submap.y()) < 0.04)) {
+        Eigen::Vector3f transformed_cell =
+            submap3d->local_pose().cast<float>() * cell_center_submap;
+        cells.emplace_back(transformed_cell[0], transformed_cell[1],
+                           transformed_cell[2], tsd);
+      }
     }
+
     msg = ToPointCloud2Message(
         ::cartographer::common::ToUniversal(FromRos(::ros::Time::now())),
         "world", cells);
