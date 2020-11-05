@@ -25,17 +25,17 @@ options = {
     },
     {
       action = "follower_filter",
-      yaw_range = 20,
-      follow_distance = 3,
-      min_height = 0,
+      yaw_range = 60,
+      follow_distance = 4,
+      min_height = 0.5,
       max_height = 3
     },
     {
       action = "write_mesh",
-      aggregate = 25,
+      aggregate = 5,
       filename = "result-follower-filter.ply",
-      poisson_depth = 10,
-      trim_surface = 10.5
+      poisson_depth = 9,
+      trim_surface = 10
     },
   }
 }
