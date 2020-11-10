@@ -239,6 +239,10 @@ class Node {
   // simulation time is standing still. This prevents overflowing the transform
   // listener buffer by publishing the same transforms over and over again.
   ::ros::Timer publish_local_trajectory_data_timer_;
+
+  ::cartographer::common::Time last_range_data_time;
+  ::cartographer::common::Time last_odometer_data_time;
+  ::cartographer::common::Time last_imu_data_time;
 };
 
 }  // namespace cartographer_ros

@@ -94,10 +94,6 @@ class SensorBridge {
       trajectory_builder_;
 
   absl::optional<::cartographer::transform::Rigid3d> ecef_to_local_frame_;
-
-  ::cartographer::common::Time last_range_data_time;
-  ::cartographer::common::Time last_odometer_data_time;
-  ::cartographer::common::Time last_imu_data_time;
 };
 
 }  // namespace cartographer_ros

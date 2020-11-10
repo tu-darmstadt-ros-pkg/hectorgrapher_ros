@@ -800,6 +800,12 @@ void Node::HandleOdometryMessage(const int trajectory_id,
   if (!sensor_samplers_.at(trajectory_id).odometry_sampler.Pulse()) {
     return;
   }
+  if (last_odometer_data_time >= FromRos(msg->header.stamp)) {
+    ROS_WARN("Dropping odom data to maintain time consistency.");
+    return;
+  } else {
+    last_odometer_data_time = FromRos(msg->header.stamp);
+  }
   auto sensor_bridge_ptr = map_builder_bridge_.sensor_bridge(trajectory_id);
   auto odometry_data_ptr = sensor_bridge_ptr->ToOdometryData(msg);
   if (odometry_data_ptr != nullptr) {
@@ -841,6 +847,12 @@ void Node::HandleImuMessage(const int trajectory_id,
   if (!sensor_samplers_.at(trajectory_id).imu_sampler.Pulse()) {
     return;
   }
+  if (last_imu_data_time >= FromRos(msg->header.stamp)) {
+    ROS_WARN("Dropping imu data to maintain time consistency.");
+    return;
+  } else {
+    last_imu_data_time = FromRos(msg->header.stamp);
+  }
   auto sensor_bridge_ptr = map_builder_bridge_.sensor_bridge(trajectory_id);
   auto imu_data_ptr = sensor_bridge_ptr->ToImuData(msg);
   if (imu_data_ptr != nullptr) {
@@ -856,6 +868,12 @@ void Node::HandleLaserScanMessage(const int trajectory_id,
   if (!sensor_samplers_.at(trajectory_id).rangefinder_sampler.Pulse()) {
     return;
   }
+  if (last_range_data_time >= FromRos(msg->header.stamp)) {
+    ROS_WARN("Dropping pointcloud to maintain time consistency.");
+    return;
+  } else {
+    last_range_data_time = FromRos(msg->header.stamp);
+  }
   map_builder_bridge_.sensor_bridge(trajectory_id)
       ->HandleLaserScanMessage(sensor_id, msg);
 }
@@ -867,6 +885,12 @@ void Node::HandleMultiEchoLaserScanMessage(
   if (!sensor_samplers_.at(trajectory_id).rangefinder_sampler.Pulse()) {
     return;
   }
+  if (last_range_data_time >= FromRos(msg->header.stamp)) {
+    ROS_WARN("Dropping pointcloud to maintain time consistency.");
+    return;
+  } else {
+    last_range_data_time = FromRos(msg->header.stamp);
+  }
   map_builder_bridge_.sensor_bridge(trajectory_id)
       ->HandleMultiEchoLaserScanMessage(sensor_id, msg);
 }
@@ -877,6 +901,12 @@ void Node::HandlePointCloud2Message(
   absl::MutexLock lock(&mutex_);
   if (!sensor_samplers_.at(trajectory_id).rangefinder_sampler.Pulse()) {
     return;
+  }
+  if (last_range_data_time >= FromRos(msg->header.stamp)) {
+    ROS_WARN("Dropping pointcloud to maintain time consistency.");
+    return;
+  } else {
+    last_range_data_time = FromRos(msg->header.stamp);
   }
   map_builder_bridge_.sensor_bridge(trajectory_id)
       ->HandlePointCloud2Message(sensor_id, msg);

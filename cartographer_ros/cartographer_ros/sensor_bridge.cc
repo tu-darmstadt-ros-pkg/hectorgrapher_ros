@@ -65,12 +65,6 @@ std::unique_ptr<carto::sensor::OdometryData> SensorBridge::ToOdometryData(
 
 void SensorBridge::HandleOdometryMessage(
     const std::string& sensor_id, const nav_msgs::Odometry::ConstPtr& msg) {
-  if (last_odometer_data_time >= FromRos(msg->header.stamp)) {
-    ROS_WARN("Dropping odom data to maintain time consistency.");
-    return;
-  } else {
-    last_odometer_data_time = FromRos(msg->header.stamp);
-  }
   std::unique_ptr<carto::sensor::OdometryData> odometry_data =
       ToOdometryData(msg);
   if (odometry_data != nullptr) {
@@ -154,12 +148,6 @@ void SensorBridge::HandleImuMessage(const std::string& sensor_id,
                                     const sensor_msgs::Imu::ConstPtr& msg) {
   std::unique_ptr<carto::sensor::ImuData> imu_data = ToImuData(msg);
   if (imu_data != nullptr) {
-    if (last_imu_data_time >= FromRos(msg->header.stamp)) {
-      ROS_WARN("Dropping imu data to maintain time consistency.");
-      return;
-    } else {
-      last_imu_data_time = FromRos(msg->header.stamp);
-    }
     trajectory_builder_->AddSensorData(
         sensor_id,
         carto::sensor::ImuData{imu_data->time, imu_data->linear_acceleration,
@@ -189,12 +177,6 @@ void SensorBridge::HandlePointCloud2Message(
     const sensor_msgs::PointCloud2::ConstPtr& msg) {
   carto::sensor::PointCloudWithIntensities point_cloud;
   carto::common::Time time;
-  if (last_range_data_time >= FromRos(msg->header.stamp)) {
-    ROS_WARN("Dropping pointcloud to maintain time consistency.");
-    return;
-  } else {
-    last_range_data_time = FromRos(msg->header.stamp);
-  }
   if (handle_scan_as_structured_cloud_) {
     std::tie(point_cloud, time) = ToStructuredPointCloudWithIntensities(*msg);
   } else {
