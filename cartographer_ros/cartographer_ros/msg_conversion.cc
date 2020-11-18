@@ -287,7 +287,7 @@ ToStructuredPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
   pcl::PointCloud<PointXYZIR> input_cloud;
   pcl::fromROSMsg(msg, input_cloud);
   PointCloudWithIntensities point_cloud;
-  point_cloud.points.resize(NUM_POINTS, {Eigen::Vector3f{0.f, 0.f, 0.f}, 0.f});
+  point_cloud.points.resize(NUM_POINTS, {Eigen::Vector3f{std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN()}, 0.f});
   point_cloud.intensities.resize(NUM_ROWS * NUM_POINTS_PER_LINE, 0.f);
   for (int i = 0; i < input_cloud.points.size(); ++i) {
     PointXYZIR point;
