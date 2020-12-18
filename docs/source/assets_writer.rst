@@ -103,8 +103,10 @@ The available ``PointsProcessor``\ s are all defined in the `cartographer/io`_ s
 * **intensity_to_color**: Applies ('intensity' - min) / (max - min) * 255 and color the point grey with this value for each point that comes from the sensor with 'frame_id'. If 'frame_id' is empty, this applies to all points.
 * **min_max_range_filtering**: Filters all points that are farther away from their 'origin' as 'max_range' or closer than 'min_range'.
 * **voxel_filter_and_remove_moving_objects**: Voxel filters the data and only passes on points that we believe are on non-moving objects.
+* **follower_filter**: Removes points in a shape around the robot that can be specified by the parameters.
 * **write_pcd**: Streams a PCD file to disk. The header is written in 'Flush'.
 * **write_ply**: Streams a PLY file to disk. The header is written in 'Flush'.
+* **write_mesh**: Streams a PLY file to disk. The ply contains a reconstructed mesh instead of a pointcloud.
 * **write_probability_grid**: Creates a probability grid with the specified 'resolution'. As all points are projected into the x-y plane the z component of the data is ignored. 'range_data_inserter' options are used to cofnigure the range data ray tracing through the probability grid.
 * **write_xray_image**: Creates X-ray cuts through the points with pixels being 'voxel_size' big.
 * **write_xyz**: Writes ASCII xyz points.
@@ -130,3 +132,51 @@ Once you have the ``.ply``, follow the README of `point_cloud_viewer`_ to genera
 .. _point_cloud_viewer: https://github.com/googlecartographer/point_cloud_viewer
 
 .. image:: point_cloud_viewer_demo_3d.jpg
+
+Mesh reconstruction
+------------------------------------------
+
+For reconstructing a mesh the `write_mesh` PointsProcessor can be used. It uses Open3D and the included poisson surface reconstruction algorithm.
+The following parameters can be used to tune the processor.
+
+.. code-block:: json
+
+    {
+      action = "write_mesh",
+      aggregate = 5,
+      filename = "reconstructed.ply",
+      poisson_depth = 11,
+      trim_surface = 10.5,
+      statistical_outlier_neighbours = 20,
+      statistical_outlier_radius = 2.0
+    }
+
+* **aggregate** is used to define how many time frames are aggregated before estimating the normals for the current aggregated points. Higher values can improve accuracy of normal estimation because surfaces are more complete, but since the position of the robot changes more with increasing time the normals can be misplaced as well if aggregation is too high.
+* **poisson_depth** defines the depth for poisson algorithm as described in http://www.open3d.org/docs/release/python_api/open3d.geometry.TriangleMesh.html#open3d.geometry.TriangleMesh.create_from_point_cloud_poisson
+* **trim_surface** is used to trim the reconstructed surface afterwards. This is needed because poisson tends to create closed geometry, which leads to artifacts if scanned objects are rather open. Trimming removes surfaces with density lower than the defined threshold.
+
+Removing of statistical outlier is done before creating the mesh and is optional.
+As described here http://www.open3d.org/docs/release/python_api/open3d.geometry.PointCloud.html#open3d.geometry.PointCloud.remove_statistical_outlier
+"Function to remove points that are further away from their neighbors in average"
+
+* **statistical_outlier_neighbours** (optional)  "Number of neighbors around the target point."
+* **statistical_outlier_radius** (optional) "Standard deviation ratio."
+
+Follower filter
+------------------------------------------
+
+The follower filter is used to remove points around the robot, especially behind the robot. This can be used to remove a person, that is monitoring the robot during its run.
+
+.. code-block:: json
+
+   {
+     action = "follower_filter",
+     yaw_range = 60,
+     follow_distance = 3,
+     min_height = 0,
+     max_height = 2
+   }
+
+* **follow_distance** is the maximum distance at which points are removed
+* **min_height** and **max_height** parameter can be used to specify the range in z-direction at which points are removed e.g. the height of the person
+* **yaw_range** is the angle at which points are removed. If this is set to 360 degree the points are removed not only behind the robot but also in front of the robot. This can be needed, if the person moved from behind the robot to the front during a single run.

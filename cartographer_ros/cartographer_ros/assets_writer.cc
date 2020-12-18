@@ -33,6 +33,7 @@
 #include "cartographer/sensor/point_cloud.h"
 #include "cartographer/sensor/range_data.h"
 #include "cartographer/transform/transform_interpolation_buffer.h"
+#include "cartographer/io/color.h"
 #include "cartographer_ros/msg_conversion.h"
 #include "cartographer_ros/ros_map_writing_points_processor.h"
 #include "cartographer_ros/time_conversion.h"
@@ -124,9 +125,13 @@ std::unique_ptr<carto::io::PointsBatch> HandleMessage(
     points_batch->points.push_back(
         sensor_to_map *
         carto::sensor::ToRangefinderPoint(point_cloud.points[i]));
+    points_batch->sensor_to_map = sensor_to_map;
     points_batch->intensities.push_back(point_cloud.intensities[i]);
     // We use the last transform for the origin, which is approximately correct.
     points_batch->origin = sensor_to_map * Eigen::Vector3f::Zero();
+  }
+  for (size_t i = 0; i < point_cloud.colors.size(); ++i) {
+    points_batch->colors.push_back(carto::io::ToFloatColor(point_cloud.colors[i]));
   }
   if (points_batch->points.empty()) {
     return nullptr;
@@ -178,6 +183,10 @@ void AssetsWriter::Run(const std::string& configuration_directory,
           lua_parameter_dictionary->GetDictionary("pipeline").get());
   const std::string tracking_frame =
       lua_parameter_dictionary->GetString("tracking_frame");
+  std::string pointcloud2_topic;
+  if(lua_parameter_dictionary->HasKey("filter_pointcloud2_topic")) {
+    pointcloud2_topic = lua_parameter_dictionary->GetString("filter_pointcloud2_topic");
+  }
 
   do {
     for (size_t trajectory_id = 0; trajectory_id < bag_filenames_.size();
@@ -231,9 +240,18 @@ void AssetsWriter::Run(const std::string& configuration_directory,
 
           std::unique_ptr<carto::io::PointsBatch> points_batch;
           if (delayed_message.isType<sensor_msgs::PointCloud2>()) {
-            points_batch = HandleMessage(
-                *delayed_message.instantiate<sensor_msgs::PointCloud2>(),
-                tracking_frame, tf_buffer, transform_interpolation_buffer);
+            if(pointcloud2_topic != "") {
+              // if pointcloud2_topic was specified only handle messages for that topic
+              if(delayed_message.getTopic() == pointcloud2_topic) {
+                points_batch = HandleMessage(
+                        *delayed_message.instantiate<sensor_msgs::PointCloud2>(),
+                        tracking_frame, tf_buffer, transform_interpolation_buffer);
+              }
+            } else {
+              points_batch = HandleMessage(
+                      *delayed_message.instantiate<sensor_msgs::PointCloud2>(),
+                      tracking_frame, tf_buffer, transform_interpolation_buffer);
+            }
           } else if (delayed_message
                          .isType<sensor_msgs::MultiEchoLaserScan>()) {
             points_batch = HandleMessage(
