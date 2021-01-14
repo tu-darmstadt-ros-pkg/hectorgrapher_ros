@@ -243,6 +243,8 @@ class Node {
   ::cartographer::common::Time last_range_data_time;
   ::cartographer::common::Time last_odometer_data_time;
   ::cartographer::common::Time last_imu_data_time;
+  ::cartographer::common::Time last_latest_tf_publish_time;
+  ::cartographer::common::Time last_optimized_tf_publish_time;
 };
 
 }  // namespace cartographer_ros

@@ -234,20 +234,21 @@ void Node::PublishLocalTrajectoryData(const ::ros::TimerEvent& timer_event) {
                            trajectory_data.local_slam_data->local_pose);
     }
 
-    geometry_msgs::TransformStamped stamped_transform;
+    geometry_msgs::TransformStamped stamped_transform_t_latest;
+    geometry_msgs::TransformStamped stamped_transform_t_optimized;
     // If we do not publish a new point cloud, we still allow time of the
     // published poses to advance. If we already know a newer pose, we use its
     // time instead. Since tf knows how to interpolate, providing newer
     // information is better.
-    const ::cartographer::common::Time now = std::max(
-        FromRos(ros::Time::now()), extrapolator.GetLastExtrapolatedTime());
-    stamped_transform.header.stamp =
-        node_options_.use_pose_extrapolator
-            ? ToRos(now)
-            : ToRos(trajectory_data.local_slam_data->time);
+    const ::cartographer::common::Time t_now = FromRos(ros::Time::now());
+    const ::cartographer::common::Time t_optimized =
+        trajectory_data.local_slam_data->time;
+
+    stamped_transform_t_latest.header.stamp = ToRos(t_now);
+    stamped_transform_t_optimized.header.stamp = ToRos(t_optimized);
     const Rigid3d tracking_to_local_3d =
         node_options_.use_pose_extrapolator
-            ? extrapolator.ExtrapolatePose(now)
+            ? extrapolator.ExtrapolatePose(t_now)
             : trajectory_data.local_slam_data->local_pose;
     const Rigid3d tracking_to_local = [&] {
       if (trajectory_data.trajectory_options.publish_frame_projected_to_2d) {
@@ -267,37 +268,59 @@ void Node::PublishLocalTrajectoryData(const ::ros::TimerEvent& timer_event) {
         if (trajectory_data.trajectory_options.provide_odom_frame) {
           std::vector<geometry_msgs::TransformStamped> stamped_transforms;
 
-          stamped_transform.header.frame_id = node_options_.map_frame;
-          stamped_transform.child_frame_id =
+          stamped_transform_t_latest.header.frame_id = node_options_.map_frame;
+          stamped_transform_t_latest.child_frame_id =
               trajectory_data.trajectory_options.odom_frame;
-          stamped_transform.transform =
+          stamped_transform_t_latest.transform =
               ToGeometryMsgTransform(trajectory_data.local_to_map);
-          stamped_transforms.push_back(stamped_transform);
+          stamped_transforms.push_back(stamped_transform_t_latest);
 
-          stamped_transform.header.frame_id =
+          stamped_transform_t_latest.header.frame_id =
               trajectory_data.trajectory_options.odom_frame;
-          stamped_transform.child_frame_id =
+          stamped_transform_t_latest.child_frame_id =
               trajectory_data.trajectory_options.published_frame;
-          stamped_transform.transform = ToGeometryMsgTransform(
+          stamped_transform_t_latest.transform = ToGeometryMsgTransform(
               tracking_to_local * (*trajectory_data.published_to_tracking));
-          stamped_transforms.push_back(stamped_transform);
+          stamped_transforms.push_back(stamped_transform_t_latest);
 
           tf_broadcaster_.sendTransform(stamped_transforms);
         } else {
-          stamped_transform.header.frame_id = node_options_.map_frame;
-          stamped_transform.child_frame_id =
-              trajectory_data.trajectory_options.published_frame;
-          stamped_transform.transform = ToGeometryMsgTransform(
-              tracking_to_map * (*trajectory_data.published_to_tracking));
-          tf_broadcaster_.sendTransform(stamped_transform);
+          std::unique_ptr<::cartographer::transform::Rigid3d>
+              tf_transform_t_optimized =
+                  map_builder_bridge_.sensor_bridge(entry.first)
+                      ->tf_bridge()
+                      .LookupToTracking(
+                          t_optimized,
+                          entry.second.trajectory_options.published_frame);
+          if (last_latest_tf_publish_time < t_now) {
+            stamped_transform_t_latest.header.frame_id =
+                node_options_.map_frame;
+            stamped_transform_t_latest.child_frame_id =
+                trajectory_data.trajectory_options.published_frame;
+            stamped_transform_t_latest.transform = ToGeometryMsgTransform(
+                tracking_to_map * (*tf_transform_t_optimized));
+            tf_broadcaster_.sendTransform(stamped_transform_t_latest);
+            last_latest_tf_publish_time = t_now;
+          }
+          if (last_optimized_tf_publish_time < t_optimized) {
+            stamped_transform_t_optimized.header.frame_id =
+                trajectory_data.trajectory_options.published_frame;
+            stamped_transform_t_optimized.child_frame_id =
+                node_options_.map_frame + "_optimized";
+            stamped_transform_t_optimized.transform = ToGeometryMsgTransform(
+                (tracking_to_map * (*tf_transform_t_optimized)).inverse());
+            tf_broadcaster_.sendTransform(stamped_transform_t_optimized);
+            last_optimized_tf_publish_time = t_optimized;
+          }
         }
-        last_updated_published_transforms_[entry.first] = stamped_transform;
+        last_updated_published_transforms_[entry.first] =
+            stamped_transform_t_latest;
       } else {
         geometry_msgs::TransformStamped stamped_transform =
             last_updated_published_transforms_[entry.first];
         stamped_transform.header.stamp =
             node_options_.use_pose_extrapolator
-                ? ToRos(now)
+                ? ToRos(t_now)
                 : ToRos(trajectory_data.local_slam_data->time);
         tf_broadcaster_.sendTransform(stamped_transform);
       }
@@ -317,7 +340,7 @@ void Node::PublishLocalTrajectoryData(const ::ros::TimerEvent& timer_event) {
 
         sensor_msgs::PointCloud2 cloud_in_world = ToPointCloud2Message(
             carto::common::ToUniversal(trajectory_data.local_slam_data->time),
-            node_options_.map_frame,
+            node_options_.map_frame + "_optimized",
             carto::sensor::TransformTimedPointCloud(
                 point_cloud, trajectory_data.local_to_map.cast<float>()));
         sensor_msgs::PointCloud2 cloud_in_sensor_frame;
