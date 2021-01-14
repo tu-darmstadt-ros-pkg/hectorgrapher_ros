@@ -27,6 +27,12 @@ int main(int argc, char** argv) {
   ::ros::init(argc, argv, "cartographer_offline_node");
   ::ros::start();
 
+  // Uncomment for debugging by attaching to the process, e.g. with clion,
+  // then halt the process and set the value wait_for_attach to 1
+//  volatile bool wait_for_attach = false;
+//  ROS_INFO("Waiting for debugger to attach... set wait_for_attach to 1 to resume");
+//  while (!wait_for_attach) {}
+
   cartographer_ros::ScopedRosLogSink ros_log_sink;
 
   const cartographer_ros::MapBuilderFactory map_builder_factory =
