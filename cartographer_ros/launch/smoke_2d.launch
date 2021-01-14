@@ -15,20 +15,36 @@
 -->
 
 <launch>
-  <param name="robot_description"
-    command="$(find xacro)/xacro $(find smoke_navigation_module_description)/urdf/smoke_navigation_module.urdf.xacro" />
 
-  <node name="robot_state_publisher" pkg="robot_state_publisher"
-    type="robot_state_publisher" />
+
+  <!-- <include file="$(find asterix_description)/launch/load_description.launch"></include> -->
+
+  <!-- <param name="robot_description" -->
+    <!-- command="$(find xacro)/xacro $(find asterix_description)/urdf/asterix_ugv.urdf.xacro" /> -->
+  <!-- <param name="robot_description" -->
+    <!-- command="$(find xacro)/xacro $(find smoke_navigation_module_description)/urdf/smoke_navigation_module.urdf.xacro" /> -->
+
+  <!-- FOR DORTMUND TEST: -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="static_radar_compensation_2" args="0 0 0 0 0 0 base_link mpr_frame"/>
+
+  <!-- <param name="robot_description" -->
+    <!-- command="$(find smoke_navigation_module_description)/urdf/smoke_navigation_module.urdf" /> -->
+
+  <!-- <node name="robot_state_publisher" pkg="robot_state_publisher" -->
+    <!-- type="robot_state_publisher" /> -->
 
   <node name="cartographer_node" pkg="cartographer_ros"
       type="cartographer_node" args="
           -configuration_directory $(find cartographer_ros)/configuration_files
           -configuration_basename smoke_2d.lua"
       output="screen">
-    <remap from="/imu" to="/imu/data" />
-    <remap from="/scan" to="/lidar/scan" />
-    <remap from="/points2" to="/radar_filter/radar_pcl_gnc" />
+    <remap from="/scan" to="/velodyne_points" />
+    <!-- <remap from="imu" to="/imu/xsens/data" /> -->
+    <!-- <remap from="scan" to="/lidar/scan" /> -->
+    <!-- <remap from="/odom" to="/odom_raw" /> -->
+    <!-- <remap from="points2" to="/radar_filter/radar_pcl_gnc" /> -->
+    <!-- <remap from="/points2" to="/ti_mmwave/radar_scan_pcl" /> -->
+    <!-- <remap from="/points2" to="/radar_filter/radar_cash_cfar_pcl" /> -->
   </node>
 
   <node name="cartographer_occupancy_grid_node" pkg="cartographer_ros"

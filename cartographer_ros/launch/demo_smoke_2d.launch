@@ -20,7 +20,19 @@
   <include file="$(find cartographer_ros)/launch/smoke_2d.launch" />
 
   <node name="rviz" pkg="rviz" type="rviz" required="true"
-      args="-d $(find cartographer_ros)/configuration_files/demo_2d.rviz" />
+      args="-d $(find cartographer_ros)/configuration_files/evaluation_2d.rviz" />
   <node name="playbag" pkg="rosbag" type="play"
-      args="--clock $(arg bag_filename) -d 1" />
+      args="--clock $(arg bag_filename) -d 1 -r 0.8 -s 0" />
+  <!-- Collect trajectory for evaluation when finished -->
+  <node name="pickle_trajectory" pkg="radar_filter" type="collect_trajectory.py"
+      args="$(arg bag_filename)" />
+      <!-- launch-prefix="bash -c 'sleep `rosbag info -y -k $(arg bag_filename)`'" -->
+  <!-- Publish Ground truth trajectory -->
+  <node name="gt_trajectory" pkg="radar_filter" type="pub_marker_array.py"
+      args="$(arg bag_filename)" />
+  <!-- Radar Processing Service -->
+  <!-- <node name="process_adc" pkg="radar_filter" type="process_radar_cube.py" /> -->
+          
 </launch>
+
+<!-- rosbag filter move_lab_imu.bag move_lab_imu_2.bag 'topic != "/tf" or topic == "/tf" and m.transforms[0].header.frame_id != "base_stabilized_link" and m.transforms[0].child_frame_id != "base_link"' -->

@@ -24,6 +24,7 @@
   <arg name="launch_prefix" default=""/>
 
   <remap from="echoes" to="horizontal_laser_2d"/>
+  
   <include file="$(find cartographer_ros)/launch/offline_node.launch">
     <arg name="bag_filenames" value="$(arg bag_filenames)"/>
     <arg name="no_rviz" value="$(arg no_rviz)"/>
