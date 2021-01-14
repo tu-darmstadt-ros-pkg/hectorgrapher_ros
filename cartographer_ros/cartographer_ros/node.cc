@@ -786,6 +786,16 @@ void Node::HandlePointCloud2Message(
   map_builder_bridge_.sensor_bridge(trajectory_id)
       ->HandlePointCloud2Message(sensor_id, msg);
 }
+void Node::HandlePointCloud2Message(
+    const int trajectory_id, const std::string& sensor_id,
+    const sensor_msgs::PointCloud2& msg) {
+  absl::MutexLock lock(&mutex_);
+  if (!sensor_samplers_.at(trajectory_id).rangefinder_sampler.Pulse()) {
+    return;
+  }
+  map_builder_bridge_.sensor_bridge(trajectory_id)
+      ->HandlePointCloud2Message(sensor_id, msg);
+}
 
 void Node::SerializeState(const std::string& filename,
                           const bool include_unfinished_submaps) {

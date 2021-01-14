@@ -110,6 +110,8 @@ class Node {
       const sensor_msgs::MultiEchoLaserScan::ConstPtr& msg);
   void HandlePointCloud2Message(int trajectory_id, const std::string& sensor_id,
                                 const sensor_msgs::PointCloud2::ConstPtr& msg);
+  void HandlePointCloud2Message(int trajectory_id, const std::string& sensor_id,
+                                const sensor_msgs::PointCloud2& msg);
 
   // Serializes the complete Node state.
   void SerializeState(const std::string& filename,

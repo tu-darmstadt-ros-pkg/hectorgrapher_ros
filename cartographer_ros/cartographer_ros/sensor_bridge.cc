@@ -178,6 +178,14 @@ void SensorBridge::HandlePointCloud2Message(
   std::tie(point_cloud, time) = ToPointCloudWithIntensities(*msg);
   HandleRangefinder(sensor_id, time, msg->header.frame_id, point_cloud.points);
 }
+void SensorBridge::HandlePointCloud2Message(
+    const std::string& sensor_id,
+    const sensor_msgs::PointCloud2& msg) {
+  carto::sensor::PointCloudWithIntensities point_cloud;
+  carto::common::Time time;
+  std::tie(point_cloud, time) = ToPointCloudWithIntensities(msg);
+  HandleRangefinder(sensor_id, time, msg.header.frame_id, point_cloud.points);
+}
 
 const TfBridge& SensorBridge::tf_bridge() const { return tf_bridge_; }
 
@@ -232,11 +240,12 @@ void SensorBridge::HandleRangefinder(
   const auto sensor_to_tracking =
       tf_bridge_.LookupToTracking(time, CheckNoLeadingSlash(frame_id));
   if (sensor_to_tracking != nullptr) {
+    auto temp = carto::sensor::TimedPointCloudData{
+        time, sensor_to_tracking->translation().cast<float>(),
+        carto::sensor::TransformTimedPointCloud(
+            ranges, sensor_to_tracking->cast<float>())};
     trajectory_builder_->AddSensorData(
-        sensor_id, carto::sensor::TimedPointCloudData{
-                       time, sensor_to_tracking->translation().cast<float>(),
-                       carto::sensor::TransformTimedPointCloud(
-                           ranges, sensor_to_tracking->cast<float>())});
+        sensor_id, temp);
   }
 }
 

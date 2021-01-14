@@ -30,6 +30,9 @@
 #include "ros/callback_queue.h"
 #include "rosgraph_msgs/Clock.h"
 #include "tf2_ros/static_transform_broadcaster.h"
+#include "dca1000_rospkg/AdcData.h"
+#include "radar_filter/ProcessAdcData.h"
+#include <cstdlib>
 #include "urdf/model.h"
 
 DEFINE_bool(collect_metrics, false,
@@ -79,6 +82,17 @@ constexpr int kSingleThreaded = 1;
 // always interpolate.
 const ::ros::Duration kDelay = ::ros::Duration(1.0);
 
+sensor_msgs::PointCloud2 pcl;
+//volatile bool pcl_is_available = false;
+//sensor_msgs::PointCloud2 radar_pcl;
+//sensor_msgs::PointCloud2ConstPtr radar_pcl_ptr;
+//void handle_radar_pcl(const sensor_msgs::PointCloud2ConstPtr pcl) {
+//  ROS_INFO("Got PCL Data!");
+//  radar_pcl = *pcl;  // copy?
+//  radar_pcl_ptr = pcl;
+//  pcl_is_available = true;
+//}
+
 void RunOfflineNode(const MapBuilderFactory& map_builder_factory) {
   CHECK(!FLAGS_configuration_directory.empty())
       << "-configuration_directory is missing.";
@@ -94,6 +108,13 @@ void RunOfflineNode(const MapBuilderFactory& map_builder_factory) {
   std::vector<TrajectoryOptions> bag_trajectory_options(1);
   std::tie(node_options, bag_trajectory_options.at(0)) =
       LoadOptions(FLAGS_configuration_directory, configuration_basenames.at(0));
+
+  // service to handle adc data processing live
+  ros::NodeHandle n;
+  ros::ServiceClient adc_client =
+      n.serviceClient<radar_filter::ProcessAdcData>("process_adc_data", true);
+  radar_filter::ProcessAdcData process_adc_srv;
+  adc_client.waitForExistence();
 
   for (size_t bag_index = 1; bag_index < bag_filenames.size(); ++bag_index) {
     TrajectoryOptions current_trajectory_options;
@@ -163,7 +184,6 @@ void RunOfflineNode(const MapBuilderFactory& map_builder_factory) {
         clock_publisher.publish(clock);
       },
       false /* oneshot */, false /* autostart */);
-
   std::vector<
       std::set<cartographer::mapping::TrajectoryBuilderInterface::SensorId>>
       bag_expected_sensor_ids;
@@ -246,7 +266,7 @@ void RunOfflineNode(const MapBuilderFactory& map_builder_factory) {
     bag_topics.insert(resolved_topic);
     bag_topics_string << resolved_topic << ",";
   }
-  bool print_topics = false;
+  bool print_topics = true;
   for (const auto& entry : bag_topic_to_sensor_id) {
     const std::string& resolved_topic = entry.first.second;
     if (bag_topics.count(resolved_topic) == 0) {
@@ -334,6 +354,23 @@ void RunOfflineNode(const MapBuilderFactory& map_builder_factory) {
         node.HandleLandmarkMessage(
             trajectory_id, sensor_id,
             msg.instantiate<cartographer_ros_msgs::LandmarkList>());
+      }
+      if (msg.isType<dca1000_rospkg::AdcData>()) {
+        auto adc_data_msg = msg.instantiate<dca1000_rospkg::AdcData>();
+        dca1000_rospkg::AdcData adc_data = *adc_data_msg;
+        process_adc_srv.request.adc_data = adc_data;
+        if (!adc_client) {
+          ROS_ERROR("ADC Client not available");
+        }
+        if (adc_client.call(process_adc_srv)) {}
+        auto pcl_list = process_adc_srv.response.pointcloud2;
+        for (auto pcl : pcl_list) {
+          if (!pcl.data.empty()) {
+            //          sensor_msgs::PointCloud2Ptr pcl_ptr(&pcl);
+            //          boost::shared_ptr<sensor_msgs::PointCloud2Ptr> a = boost::make_shared<sensor_msgs::PointCloud2Ptr>(&pcl);
+            node.HandlePointCloud2Message(trajectory_id, sensor_id, pcl);
+          }
+        }
       }
     }
     clock.clock = msg.getTime();

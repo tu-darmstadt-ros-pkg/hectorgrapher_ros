@@ -71,6 +71,8 @@ class SensorBridge {
       const sensor_msgs::MultiEchoLaserScan::ConstPtr& msg);
   void HandlePointCloud2Message(const std::string& sensor_id,
                                 const sensor_msgs::PointCloud2::ConstPtr& msg);
+  void HandlePointCloud2Message(const std::string& sensor_id,
+                                const sensor_msgs::PointCloud2& msg);
 
   const TfBridge& tf_bridge() const;
 
