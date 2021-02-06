@@ -1,4 +1,4 @@
--- Copyright 2016### The Cartographer Authors
+-- Copyright 2016 The Cartographer Authors
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -25,12 +25,12 @@ options = {
   published_frame = "base_link",
   odom_frame = "odom",
   provide_odom_frame = true,
-  publish_frame_projected_to_2d = true,  -- false
+  publish_frame_projected_to_2d = false,
   use_pose_extrapolator = true,
   use_odometry = false,
   use_nav_sat = false,
   use_landmarks = false,
-  num_laser_scans = 0,
+  num_laser_scans = 1,
   num_multi_echo_laser_scans = 0,
   num_subdivisions_per_laser_scan = num_accumulated_range_data_,
   num_point_clouds = 1,
@@ -41,7 +41,7 @@ options = {
   rangefinder_sampling_ratio = 1.,
   odometry_sampling_ratio = 1.,
   fixed_frame_pose_sampling_ratio = 1.,
-  imu_sampling_ratio = 1.,  -- 1.
+  imu_sampling_ratio = 1.,
   landmarks_sampling_ratio = 1.,
 }
 
@@ -86,7 +86,7 @@ POSE_GRAPH.optimization_problem.odometry_translation_weight = 0.0
 -- POSE_GRAPH.constraint_builder.fast_correlative_scan_matcher.angular_search_window = math.rad(45.)
 -- POSE_GRAPH.optimization_problem.huber_scale = 10
 
--- Enable TSDF 
+-- Enable TSDF
 TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.range_data_inserter_type = "TSDF_INSERTER_2D"
 TRAJECTORY_BUILDER_2D.submaps.grid_options_2d.grid_type = "TSDF"
 TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.tsdf_range_data_inserter.normal_estimation_options.use_pca = false
@@ -102,7 +102,7 @@ TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.tsdf_range_data_inserter.updat
 TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.tsdf_range_data_inserter.project_sdf_distance_to_scan_normal  = false  -- true  -> false: way more detail in rviz maps!
 TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.tsdf_range_data_inserter.update_weight_angle_scan_normal_to_ray_kernel_bandwith   = 0.0
 TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.tsdf_range_data_inserter.min_normal_weight   = 0.5  -- 0.1
-TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.tsdf_range_data_inserter.truncation_distance  = 0.1 -- 0.1 
+TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.tsdf_range_data_inserter.truncation_distance  = 0.1 -- 0.1
 TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.tsdf_range_data_inserter.maximum_weight  = 1024
 TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.tsdf_range_data_inserter.update_weight_distance_cell_to_hit_kernel_bandwith  = 10  -- 10
 TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.tsdf_range_data_inserter.free_space_weight  = 0.1  -- 0.05
