@@ -47,6 +47,17 @@ install(TARGETS cartographer_offline_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
+google_binary(save_and_pub_gt_trajectory
+  SRCS
+    save_and_pub_gt_trajectory_main.cc
+)
+
+install(TARGETS save_and_pub_gt_trajectory
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 google_binary(cartographer_start_trajectory
   SRCS
     start_trajectory_main.cc
