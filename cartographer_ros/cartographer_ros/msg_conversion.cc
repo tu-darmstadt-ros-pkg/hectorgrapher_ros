@@ -385,6 +385,7 @@ ToPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
   PointCloudWithIntensities point_cloud;
   // We check for intensity field here to avoid run-time warnings if we pass in
   // a PointCloud2 without intensity.
+  float max_point_time = -std::numeric_limits<float>::infinity();
   if (PointCloud2HasField(msg, "intensity")) {
     if (PointCloud2HasField(msg, "time")) {
       pcl::PointCloud<PointXYZIT> pcl_point_cloud;
@@ -395,6 +396,7 @@ ToPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
         point_cloud.points.push_back(
             {Eigen::Vector3f{point.x, point.y, point.z}, point.time});
         point_cloud.intensities.push_back(point.intensity);
+        max_point_time = std::max(max_point_time, point.time);
       }
     } else {
       pcl::PointCloud<pcl::PointXYZI> pcl_point_cloud;
@@ -418,6 +420,7 @@ ToPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
         point_cloud.points.push_back(
             {Eigen::Vector3f{point.x, point.y, point.z}, point.time});
         point_cloud.intensities.push_back(1.0f);
+        max_point_time = std::max(max_point_time, point.time);
       }
     } else {
       pcl::PointCloud<pcl::PointXYZRGB> pcl_point_cloud;
@@ -435,11 +438,10 @@ ToPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
   }
 
   ::cartographer::common::Time timestamp = FromRos(msg.header.stamp);
-  if (!point_cloud.points.empty()) {
-    const double duration = point_cloud.points.back().time;
-    timestamp += cartographer::common::FromSeconds(duration);
+  if (!point_cloud.points.empty() && PointCloud2HasField(msg, "time")) {
+    timestamp += cartographer::common::FromSeconds(max_point_time);
     for (auto& point : point_cloud.points) {
-      point.time -= duration;
+      point.time -= max_point_time;
       CHECK_LE(point.time, 0.f)
           << "Encountered a point with a larger stamp than "
              "the last point in the cloud.";
