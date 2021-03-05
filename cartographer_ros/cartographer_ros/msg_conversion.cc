@@ -279,22 +279,31 @@ ToStructuredPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
   CHECK(has_rings)<< "ring field in PointCloud2 message missing - Disable handle_scan_as_structured_cloud or "
                      "check your range sensor driver settings.";
   bool has_intensities = PointCloud2HasField(msg, "intensity");
+  bool has_time = PointCloud2HasField(msg, "time");
 
   // Based on VLP16, TODO(kdaun) make configureable
   const int NUM_ROWS = 16;
   const int NUM_POINTS_PER_LINE = 1800;
   const int NUM_POINTS = NUM_ROWS * NUM_POINTS_PER_LINE;
-  pcl::PointCloud<PointXYZIR> input_cloud;
+  pcl::PointCloud<PointXYZIRT> input_cloud;
   pcl::fromROSMsg(msg, input_cloud);
   PointCloudWithIntensities point_cloud;
-  point_cloud.points.resize(NUM_POINTS, {Eigen::Vector3f{std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN()}, 0.f});
+  point_cloud.points.resize(
+      NUM_POINTS, {Eigen::Vector3f{std::numeric_limits<float>::quiet_NaN(),
+                                   std::numeric_limits<float>::quiet_NaN(),
+                                   std::numeric_limits<float>::quiet_NaN()},
+                   std::numeric_limits<float>::quiet_NaN()});
   point_cloud.intensities.resize(NUM_ROWS * NUM_POINTS_PER_LINE, 0.f);
+
+  float min_point_time = std::numeric_limits<float>::infinity();
+  float max_point_time = -std::numeric_limits<float>::infinity();
   for (int i = 0; i < input_cloud.points.size(); ++i) {
-    PointXYZIR point;
+    PointXYZIRT point;
     point.x = input_cloud.points[i].x;
     point.y = input_cloud.points[i].y;
     point.z = input_cloud.points[i].z;
     point.intensity = has_intensities ? input_cloud.points[i].intensity : 0.f;
+    point.time = has_time ? input_cloud.points[i].time : 0.f;
     int row_idx = -1;
 
     row_idx = input_cloud.points[i].ring;
@@ -311,8 +320,10 @@ ToStructuredPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
     int index = column_idx + row_idx * NUM_POINTS_PER_LINE;
 
     point_cloud.points[index] = {Eigen::Vector3f{point.x, point.y, point.z},
-                                 0.f};
+                                 point.time};
     point_cloud.intensities[index] = 1.0f;
+    max_point_time = std::max(max_point_time, point.time);
+    min_point_time = std::min(min_point_time, point.time);
   }
   // Debug code for structure-based pointcloud triangulation.
 //      std::vector<Eigen::Vector3i> triangles;
@@ -365,14 +376,17 @@ ToStructuredPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
 //      LOG(INFO)<<"wrote file";
 
   ::cartographer::common::Time timestamp = FromRos(msg.header.stamp);
-  if (!point_cloud.points.empty()) {
-    const double duration = point_cloud.points.back().time;
-    timestamp += cartographer::common::FromSeconds(duration);
+  if (!point_cloud.points.empty() && PointCloud2HasField(msg, "time")) {
+    timestamp += cartographer::common::FromSeconds(max_point_time);
     for (auto& point : point_cloud.points) {
-      point.time -= duration;
-      CHECK_LE(point.time, 0.f)
-          << "Encountered a point with a larger stamp than "
-             "the last point in the cloud.";
+      if (!isnan(point.time)) {
+        point.time -= max_point_time;
+        CHECK_LE(point.time, 0.f)
+            << "Encountered a point with a larger stamp than "
+               "the last point in the cloud.";
+      } else {
+        point.time = 0.f;
+      }
     }
   }
 

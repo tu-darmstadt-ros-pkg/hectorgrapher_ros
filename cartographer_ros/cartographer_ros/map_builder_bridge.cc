@@ -559,7 +559,7 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
 
     msg = ToPointCloud2Message(
         ::cartographer::common::ToUniversal(FromRos(::ros::Time::now())),
-        "world", cells);
+        "world_cartographer", cells);
   }
 
   return msg;
