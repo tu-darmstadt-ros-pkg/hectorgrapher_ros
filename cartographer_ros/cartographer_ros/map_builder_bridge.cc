@@ -230,6 +230,7 @@ cartographer_ros_msgs::SubmapList MapBuilderBridge::GetSubmapList() {
     submap_entry.submap_index = submap_id_pose.id.submap_index;
     submap_entry.submap_version = submap_id_pose.data.version;
     submap_entry.pose = ToGeometryMsgPose(submap_id_pose.data.pose);
+    submap_entry.start_stamp = ToRos(submap_id_pose.data.start_time);
     submap_list.submap.push_back(submap_entry);
   }
   return submap_list;

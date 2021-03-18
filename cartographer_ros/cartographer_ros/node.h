@@ -36,6 +36,7 @@
 #include "cartographer_ros_msgs/FinishTrajectory.h"
 #include "cartographer_ros_msgs/GetTrajectoryStates.h"
 #include "cartographer_ros_msgs/ReadMetrics.h"
+#include "cartographer_ros_msgs/StampedSubmapEntry.h"
 #include "cartographer_ros_msgs/StartTrajectory.h"
 #include "cartographer_ros_msgs/StatusResponse.h"
 #include "cartographer_ros_msgs/SubmapEntry.h"
@@ -162,6 +163,7 @@ class Node {
   int AddTrajectory(const TrajectoryOptions& options);
   void LaunchSubscribers(const TrajectoryOptions& options, int trajectory_id);
   void PublishSubmapList(const ::ros::WallTimerEvent& timer_event);
+  void PublishSubmapAnnouncement(const ::ros::WallTimerEvent& timer_event);
   void AddExtrapolator(int trajectory_id, const TrajectoryOptions& options);
   void AddSensorSamplers(int trajectory_id, const TrajectoryOptions& options);
   void PublishLocalTrajectoryData(const ::ros::TimerEvent& timer_event);
@@ -191,6 +193,7 @@ class Node {
 
   ::ros::NodeHandle node_handle_;
   ::ros::Publisher submap_list_publisher_;
+  ::ros::Publisher submap_announcement_publisher_;
   ::ros::Publisher trajectory_node_list_publisher_;
   ::ros::Publisher landmark_poses_list_publisher_;
   ::ros::Publisher constraint_list_publisher_;
@@ -245,6 +248,7 @@ class Node {
   ::cartographer::common::Time last_imu_data_time;
   ::cartographer::common::Time last_latest_tf_publish_time;
   ::cartographer::common::Time last_optimized_tf_publish_time;
+  int last_announced_submap_index_;
 };
 
 }  // namespace cartographer_ros

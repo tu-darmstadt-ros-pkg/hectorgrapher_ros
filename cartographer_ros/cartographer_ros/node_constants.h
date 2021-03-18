@@ -35,6 +35,7 @@ constexpr char kOccupancyGridTopic[] = "map";
 constexpr char kTSDFTopic[] = "tsdf";
 constexpr char kScanMatchedPointCloudTopic[] = "scan_matched_points2";
 constexpr char kSubmapListTopic[] = "submap_list";
+constexpr char kSubmapAnnouncementTopic[] = "submap_announcement";
 constexpr char kSubmapQueryServiceName[] = "submap_query";
 constexpr char kTrajectoryQueryServiceName[] = "trajectory_query";
 constexpr char kStartTrajectoryServiceName[] = "start_trajectory";
@@ -47,6 +48,7 @@ constexpr char kConstraintListTopic[] = "constraint_list";
 constexpr char kEnableMapUpdateServiceName[] = "enable_map_update";
 constexpr double kConstraintPublishPeriodSec = 0.5;
 constexpr double kTSDFPublishPeriodSec = 1.0;
+constexpr double kSubmapAnnouncementPeriodSec = 0.5;
 constexpr double kTopicMismatchCheckDelaySec = 3.0;
 
 constexpr int kInfiniteSubscriberQueueSize = 0;

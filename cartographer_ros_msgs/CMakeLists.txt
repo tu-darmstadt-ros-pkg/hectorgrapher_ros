@@ -33,6 +33,7 @@ add_message_files(
     MetricFamily.msg
     MetricLabel.msg
     Metric.msg
+    StampedSubmapEntry.msg
     StatusCode.msg
     StatusResponse.msg
     SubmapEntry.msg

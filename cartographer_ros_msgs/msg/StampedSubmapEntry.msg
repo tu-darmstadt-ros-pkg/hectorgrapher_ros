@@ -1,4 +1,4 @@
-# Copyright 2016 The Cartographer Authors
+# Copyright 2021 The Cartographer Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-int32 trajectory_id
-int32 submap_index
-int32 submap_version
-geometry_msgs/Pose pose
-bool is_frozen
-time start_stamp
+
+std_msgs/Header header
+cartographer_ros_msgs/SubmapEntry submap

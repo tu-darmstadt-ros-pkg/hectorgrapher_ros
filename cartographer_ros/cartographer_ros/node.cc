@@ -96,7 +96,8 @@ Node::Node(
     tf2_ros::Buffer* const tf_buffer, const bool collect_metrics)
     : node_options_(node_options),
       map_builder_bridge_(node_options_, std::move(map_builder), tf_buffer),
-      update_published_transform(true) {
+      update_published_transform(true),
+      last_announced_submap_index_(-1) {
   absl::MutexLock lock(&mutex_);
   if (collect_metrics) {
     metrics_registry_ = absl::make_unique<metrics::FamilyFactory>();
@@ -106,6 +107,9 @@ Node::Node(
   submap_list_publisher_ =
       node_handle_.advertise<::cartographer_ros_msgs::SubmapList>(
           kSubmapListTopic, kLatestOnlyPublisherQueueSize);
+  submap_announcement_publisher_ =
+      node_handle_.advertise<::cartographer_ros_msgs::StampedSubmapEntry>(
+          kSubmapAnnouncementTopic, kLatestOnlyPublisherQueueSize);
   trajectory_node_list_publisher_ =
       node_handle_.advertise<::visualization_msgs::MarkerArray>(
           kTrajectoryNodeListTopic, kLatestOnlyPublisherQueueSize);
@@ -139,6 +143,9 @@ Node::Node(
   wall_timers_.push_back(node_handle_.createWallTimer(
       ::ros::WallDuration(node_options_.submap_publish_period_sec),
       &Node::PublishSubmapList, this));
+  wall_timers_.push_back(node_handle_.createWallTimer(
+      ::ros::WallDuration(kSubmapAnnouncementPeriodSec),
+      &Node::PublishSubmapAnnouncement, this));
   if (node_options_.pose_publish_period_sec > 0) {
     publish_local_trajectory_data_timer_ = node_handle_.createTimer(
         ::ros::Duration(node_options_.pose_publish_period_sec),
@@ -188,7 +195,35 @@ bool Node::HandleTrajectoryQuery(
 
 void Node::PublishSubmapList(const ::ros::WallTimerEvent& unused_timer_event) {
   absl::MutexLock lock(&mutex_);
-  submap_list_publisher_.publish(map_builder_bridge_.GetSubmapList());
+  const cartographer_ros_msgs::SubmapList& submap_list =
+      map_builder_bridge_.GetSubmapList();
+  submap_list_publisher_.publish(submap_list);
+
+  std::vector<geometry_msgs::TransformStamped> stamped_transforms;
+  for (const auto& submap : submap_list.submap) {
+    geometry_msgs::TransformStamped transform;
+    transform.header = submap_list.header;
+    transform.child_frame_id = "submap_" + std::to_string(submap.submap_index);
+    transform.transform = ToGeometryMsgTransform(ToRigid3d(submap.pose));
+    stamped_transforms.push_back(transform);
+  }
+  tf_broadcaster_.sendTransform(stamped_transforms);
+}
+void Node::PublishSubmapAnnouncement(
+    const ::ros::WallTimerEvent& unused_timer_event) {
+  absl::MutexLock lock(&mutex_);
+  const cartographer_ros_msgs::SubmapList& submap_list =
+      map_builder_bridge_.GetSubmapList();
+  if (submap_list.submap.empty()) return;
+  if (int(submap_list.submap.back().submap_index) !=
+      last_announced_submap_index_) {
+    cartographer_ros_msgs::StampedSubmapEntry stamped_submap_entry;
+    stamped_submap_entry.submap = submap_list.submap.back();
+    stamped_submap_entry.header = submap_list.header;
+    submap_announcement_publisher_.publish(stamped_submap_entry);
+    last_announced_submap_index_ =
+        int(stamped_submap_entry.submap.submap_index);
+  }
 }
 
 void Node::AddExtrapolator(const int trajectory_id,
