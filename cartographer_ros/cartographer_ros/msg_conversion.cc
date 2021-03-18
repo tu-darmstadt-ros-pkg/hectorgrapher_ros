@@ -69,6 +69,14 @@ struct PointXYZIR {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
 
+struct PointXYZIRT {
+  PCL_ADD_POINT4D
+  PCL_ADD_INTENSITY;
+  uint16_t ring;
+  float time;
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
+
 }  // namespace
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
@@ -83,6 +91,11 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
     (float, x, x)(float, y, y)(float, z, z)(float, intensity,
                                             intensity)(uint16_t, ring, ring))
 
+POINT_CLOUD_REGISTER_POINT_STRUCT(
+    PointXYZIRT,
+    (float, x, x)(float, y, y)(float, z, z)(float, intensity,
+                                            intensity)(uint16_t, ring,
+                                                       ring)(float, time, time))
 namespace cartographer_ros {
 namespace {
 
