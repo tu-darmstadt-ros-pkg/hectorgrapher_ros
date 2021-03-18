@@ -109,17 +109,17 @@ std::unique_ptr<carto::io::PointsBatch> HandleMessage(
   CHECK_EQ(point_cloud.intensities.size(), point_cloud.points.size());
 
   for (size_t i = 0; i < point_cloud.points.size(); ++i) {
-    const carto::common::Time time =
+    const carto::common::Time time_point =
         point_cloud_time +
         carto::common::FromSeconds(point_cloud.points[i].time);
-    if (!transform_interpolation_buffer.Has(time)) {
+    if (!transform_interpolation_buffer.Has(point_cloud_time)) {
       continue;
     }
-    const carto::transform::Rigid3d tracking_to_map =
-        transform_interpolation_buffer.Lookup(time);
+    const carto::transform::Rigid3d tracking_to_map = transform_interpolation_buffer.Lookup(time_point);
+    // Lidar drivers, such as velodyne_ros, already compensate for joint motions. Therefore, we do not need to interpolate.
     const carto::transform::Rigid3d sensor_to_tracking =
         ToRigid3d(tf_buffer.lookupTransform(
-            tracking_frame, message.header.frame_id, ToRos(time)));
+            tracking_frame, message.header.frame_id, ToRos(point_cloud_time)));
     const carto::transform::Rigid3f sensor_to_map =
         (tracking_to_map * sensor_to_tracking).cast<float>();
     points_batch->points.push_back(
