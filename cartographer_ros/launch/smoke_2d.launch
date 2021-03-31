@@ -17,19 +17,19 @@
 <launch>
 
   <!-- Robot Models: -->
-  <include file="$(find asterix_description)/launch/load_description.launch"></include>
-  <include file="$(find asterix_description)/launch/launch_fake_joint_states.launch"></include>
-  <param name="robot_description"
-    command="$(find xacro)/xacro $(find asterix_description)/urdf/asterix_ugv.urdf.xacro" />
+  <!-- <include file="$(find asterix_description)/launch/load_description.launch"></include>
+  <include file="$(find asterix_description)/launch/launch_fake_joint_states.launch"></include> -->
+  <!-- <param name="robot_description"
+    command="$(find xacro)/xacro $(find asterix_description)/urdf/asterix_ugv.urdf.xacro" /> -->
   <!-- <param name="robot_description" -->
     <!-- command="$(find xacro)/xacro $(find smoke_navigation_module_description)/urdf/smoke_navigation_module.urdf.xacro" /> -->
   <!-- <param name="robot_description" -->
     <!-- command="$(find smoke_navigation_module_description)/urdf/smoke_navigation_module.urdf" /> -->
   <!-- FOR DORTMUND TEST: -->
   <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="static_radar_compensation_2" args="0 0 0 0 0 0 base_link mpr_frame"/> -->
-
+<!-- 
   <node name="robot_state_publisher" pkg="robot_state_publisher"
-    type="robot_state_publisher" />
+    type="robot_state_publisher" /> -->
 
   <node name="cartographer_node" pkg="cartographer_ros"
       type="cartographer_node" args="
@@ -39,12 +39,12 @@
 
     <!-- Remaps: -->
     <!-- <remap from="/scan" to="/velodyne_points" /> -->
-    <remap from="scan" to="/scan_filtered" />
+    <remap from="scan" to="/lidar/scan" />
     <!-- <remap from="imu" to="/imu/data" /> -->
     <remap from="imu" to="/imu/xsens/data" />
     <!-- <remap from="scan" to="/lidar/scan" /> -->
     <!-- <remap from="/odom" to="/odom_raw" /> -->
-    <remap from="points2" to="/radar_filter/radar_pcl_gnc" />
+    <remap from="points2" to="/radar_filter/radar_pcl" />
     
   </node>
 

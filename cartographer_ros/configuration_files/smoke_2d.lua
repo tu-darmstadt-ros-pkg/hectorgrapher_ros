@@ -16,7 +16,7 @@ include "map_builder.lua"
 include "trajectory_builder.lua"
 
 -- Number of accumulated scans, should be equal the rpm of the motor for rotating radar, otherwise 1/4 of the radar fps
-num_accumulated_range_data_ = 30
+num_accumulated_range_data_ = 60
 
 options = {
   map_builder = MAP_BUILDER,
@@ -31,7 +31,7 @@ options = {
   use_odometry = true,
   use_nav_sat = false,
   use_landmarks = false,
-  num_laser_scans = 1,
+  num_laser_scans = 0,
   num_multi_echo_laser_scans = 0,
   num_subdivisions_per_laser_scan = num_accumulated_range_data_,
   num_point_clouds = 1,
@@ -48,6 +48,7 @@ options = {
 
 MAP_BUILDER.use_trajectory_builder_2d = true
 TRAJECTORY_BUILDER_2D.use_imu_data = true
+TRAJECTORY_BUILDER_2D.min_range = 0.5
 TRAJECTORY_BUILDER_2D.num_accumulated_range_data = num_accumulated_range_data_
 TRAJECTORY_BUILDER_2D.num_accumulated_range_data_points = 0  -- zero, if only the number of scans defined by "num_accumulated_range_data" should be checked
 
