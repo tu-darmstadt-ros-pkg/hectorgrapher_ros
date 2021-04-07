@@ -235,7 +235,6 @@ void SensorBridge::HandleRangefinder(
   if (ranges.empty()) {
     return;
   }
-  CHECK_LE(ranges.back().time, 0.f);
   const auto sensor_to_tracking =
       tf_bridge_.LookupToTracking(time, CheckNoLeadingSlash(frame_id));
   if (sensor_to_tracking != nullptr) {
