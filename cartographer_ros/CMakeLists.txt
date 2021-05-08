@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.8.12)  # Ships with Ubuntu 14.04 (Trusty)
+cmake_minimum_required(VERSION 3.10)  # Ships with Ubuntu 18.04
 
 project(cartographer_ros)
+#set(CMAKE_BUILD_TYPE Debug)
+#set(FORCE_DEBUG_BUILD True)
 
 set(PACKAGE_DEPENDENCIES
   cartographer_ros_msgs

@@ -304,7 +304,7 @@ void RunOfflineTrajectoryEvaluator(
     const auto next_msg_tuple = playable_bag_multiplexer.GetNextMessage();
     const rosbag::MessageInstance& msg = std::get<0>(next_msg_tuple);
     const int bag_index = std::get<1>(next_msg_tuple);
-    const bool is_last_message_in_bag = std::get<2>(next_msg_tuple);
+//    const bool is_last_message_in_bag = std::get<2>(next_msg_tuple);
 
     if (msg.getTime() < (begin_time + ros::Duration(FLAGS_skip_seconds))) {
       continue;
@@ -333,7 +333,7 @@ void RunOfflineTrajectoryEvaluator(
         node.node_handle()->resolveName(msg.getTopic(), false /* resolve */));
     auto it = bag_topic_to_sensor_id.find(bag_topic);
     if (it != bag_topic_to_sensor_id.end()) {
-      const std::string& sensor_id = it->second.id;
+//      const std::string& sensor_id = it->second.id;
 
       if (msg.isType<sensor_msgs::Imu>()) {
         sensor_msgs::ImuConstPtr imu_msg = msg.instantiate<sensor_msgs::Imu>();

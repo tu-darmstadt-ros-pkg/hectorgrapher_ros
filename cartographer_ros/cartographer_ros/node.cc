@@ -387,7 +387,7 @@ void Node::PublishLocalTrajectoryData(const ::ros::TimerEvent& timer_event) {
                   ros::Duration(1.0));
           tf2::doTransform(cloud_in_world, cloud_in_sensor_frame, transform);
           scan_matched_point_cloud_publisher_.publish(cloud_in_sensor_frame);
-        } catch (tf2::TransformException ex) {
+        } catch (const tf2::TransformException& ex) {
           ROS_ERROR("%s", ex.what());
         }
       }

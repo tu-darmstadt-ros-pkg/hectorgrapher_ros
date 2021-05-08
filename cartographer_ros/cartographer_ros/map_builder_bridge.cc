@@ -546,8 +546,8 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
       const float tsd = tsdf->ValueConverter().ValueToTSD(voxel.discrete_tsd);
       const Eigen::Vector3f cell_center_submap =
           tsdf->GetCenterOfCell(it.GetCellIndex());
-      const Eigen::Vector3f cell_center_global =
-          submap3d->local_pose().cast<float>() * cell_center_submap;
+//      const Eigen::Vector3f cell_center_global =
+//          submap3d->local_pose().cast<float>() * cell_center_submap;
       if ((std::abs(cell_center_submap.z() - 1.0f) < 0.04) ||
           (std::abs(cell_center_submap.x()) < 0.04) ||
           (std::abs(cell_center_submap.y()) < 0.04)) {
