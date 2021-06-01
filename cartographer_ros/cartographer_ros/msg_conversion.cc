@@ -62,21 +62,6 @@ struct PointXYZIT {
   float unused_padding[2];
 };
 
-struct PointXYZIR {
-  PCL_ADD_POINT4D;
-  float intensity;
-  uint16_t ring;
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-} EIGEN_ALIGN16;
-
-struct PointXYZIRT {
-  PCL_ADD_POINT4D;
-  float intensity;
-  uint16_t ring;
-  float time;
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-} EIGEN_ALIGN16;
-
 }  // namespace
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
@@ -86,16 +71,7 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
     PointXYZIT,
     (float, x, x)(float, y, y)(float, z, z)(float, intensity,
                                             intensity)(float, time, time))
-POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIR,
-                                  (float, x, x)(float, y, y)(float, z, z)(
-                                      float, intensity,
-                                      intensity)(std::uint16_t, ring, ring))
 
-POINT_CLOUD_REGISTER_POINT_STRUCT(
-    PointXYZIRT,
-    (float, x, x)(float, y, y)(float, z, z)(float, intensity,
-                                            intensity)(std::uint16_t, ring,
-                                                       ring)(float, time, time))
 namespace cartographer_ros {
 namespace {
 
@@ -281,13 +257,10 @@ ToPointCloudWithIntensities(const sensor_msgs::MultiEchoLaserScan& msg) {
 std::tuple<::cartographer::sensor::PointCloudWithIntensities,
            ::cartographer::common::Time>
 ToStructuredPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
-  bool has_rings = PointCloud2HasField(msg, "ring");
-  CHECK(has_rings)<< "ring field in PointCloud2 message missing - Disable handle_scan_as_structured_cloud or "
-                     "check your range sensor driver settings.";
   bool has_intensities = PointCloud2HasField(msg, "intensity");
   bool has_time = PointCloud2HasField(msg, "time");
   const unsigned int num_points = msg.width * msg.height;
-  pcl::PointCloud<PointXYZIRT> input_cloud;
+  pcl::PointCloud<PointXYZIT> input_cloud;
   pcl::fromROSMsg(msg, input_cloud);
   CHECK_EQ(num_points, input_cloud.points.size());
   PointCloudWithIntensities point_cloud;
