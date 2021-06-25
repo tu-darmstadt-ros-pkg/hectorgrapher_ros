@@ -526,6 +526,193 @@ visualization_msgs::MarkerArray MapBuilderBridge::GetConstraintList() {
   return constraint_list;
 }
 
+Eigen::Vector3f MapBuilderBridge::VertexInterp(float isolevel,
+                                               Eigen::Vector3f p1,
+                                               Eigen::Vector3f p2,
+                                               float valp1,
+                                               float valp2) {
+  float mu;
+  Eigen::Vector3f p;
+
+  // If jump is too big, return a point with x index -1 to indicate it's false
+  if (std::abs(valp1 - valp2) > 0.95) {
+    p.x() = -1;
+    return (p);
+  }
+
+  if (std::abs(isolevel - valp1) < 0.00001) {
+    return (p1);
+  }
+  if (std::abs(isolevel - valp2) < 0.00001) {
+    return (p2);
+  }
+  if (std::abs(valp1 - valp2) < 0.00001) {
+    return (p1);
+  }
+  mu = (isolevel - valp1) / (valp2 - valp1);
+  p.x() = p1.x() + mu * (p2.x() - p1.x());
+  p.y() = p1.y() + mu * (p2.y() - p1.y());
+  p.z() = p1.z() + mu * (p2.z() - p1.z());
+  return (p);
+}
+
+int MapBuilderBridge::process_cube(Cube my_cube,
+                                   std::vector<Eigen::Array4f> &cloud,
+                                   float isolevel) {
+  int cubeindex = 0;
+  if (my_cube.values[0] <= isolevel) cubeindex |= 1;
+  if (my_cube.values[1] <= isolevel) cubeindex |= 2;
+  if (my_cube.values[2] <= isolevel) cubeindex |= 4;
+  if (my_cube.values[3] <= isolevel) cubeindex |= 8;
+  if (my_cube.values[4] <= isolevel) cubeindex |= 16;
+  if (my_cube.values[5] <= isolevel) cubeindex |= 32;
+  if (my_cube.values[6] <= isolevel) cubeindex |= 64;
+  if (my_cube.values[7] <= isolevel) cubeindex |= 128;
+
+//  LOG(INFO) << "V0: " << my_cube.values[0] << "\t"
+//      << "V1: " << my_cube.values[1] << "\t"
+//      << "V2: " << my_cube.values[2] << "\t"
+//      << "V3: " << my_cube.values[3] << "\t"
+//      << "V4: " << my_cube.values[4] << "\t"
+//      << "V5: " << my_cube.values[5] << "\t"
+//      << "V6: " << my_cube.values[6] << "\t"
+//      << "V7: " << my_cube.values[7] << "\t";
+
+  // Cube is entirely in/out of the surface
+  if (edgeTable[cubeindex] == 0) {
+    return (0);
+  }
+  Eigen::Vector3f vertlist[12];
+
+  // Find the points where the surface intersects the cube
+  if (edgeTable[cubeindex] & 1) {
+    vertlist[0] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[0],
+                     my_cube.vertice_pos_global[1],
+                     my_cube.values[0],
+                     my_cube.values[1]);
+  }
+  if (edgeTable[cubeindex] & 2) {
+    vertlist[1] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[1],
+                     my_cube.vertice_pos_global[2],
+                     my_cube.values[1],
+                     my_cube.values[2]);
+  }
+  if (edgeTable[cubeindex] & 4) {
+    vertlist[2] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[2],
+                     my_cube.vertice_pos_global[3],
+                     my_cube.values[2],
+                     my_cube.values[3]);
+  }
+  if (edgeTable[cubeindex] & 8) {
+    vertlist[3] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[3],
+                     my_cube.vertice_pos_global[0],
+                     my_cube.values[3],
+                     my_cube.values[0]);
+  }
+  if (edgeTable[cubeindex] & 16) {
+    vertlist[4] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[4],
+                     my_cube.vertice_pos_global[5],
+                     my_cube.values[4],
+                     my_cube.values[5]);
+  }
+  if (edgeTable[cubeindex] & 32) {
+    vertlist[5] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[5],
+                     my_cube.vertice_pos_global[6],
+                     my_cube.values[5],
+                     my_cube.values[6]);
+  }
+  if (edgeTable[cubeindex] & 64) {
+    vertlist[6] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[6],
+                     my_cube.vertice_pos_global[7],
+                     my_cube.values[6],
+                     my_cube.values[7]);
+  }
+  if (edgeTable[cubeindex] & 128) {
+    vertlist[7] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[7],
+                     my_cube.vertice_pos_global[4],
+                     my_cube.values[7],
+                     my_cube.values[4]);
+  }
+  if (edgeTable[cubeindex] & 256) {
+    vertlist[8] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[0],
+                     my_cube.vertice_pos_global[4],
+                     my_cube.values[0],
+                     my_cube.values[4]);
+  }
+  if (edgeTable[cubeindex] & 512) {
+    vertlist[9] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[1],
+                     my_cube.vertice_pos_global[5],
+                     my_cube.values[1],
+                     my_cube.values[5]);
+  }
+  if (edgeTable[cubeindex] & 1024) {
+    vertlist[10] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[2],
+                     my_cube.vertice_pos_global[6],
+                     my_cube.values[2],
+                     my_cube.values[6]);
+  }
+  if (edgeTable[cubeindex] & 2048) {
+    vertlist[11] =
+        VertexInterp(isolevel,
+                     my_cube.vertice_pos_global[3],
+                     my_cube.vertice_pos_global[7],
+                     my_cube.values[3],
+                     my_cube.values[7]);
+  }
+//  for (int i = 0; i < 12; i++) {
+//    if (vertlist[i].x() < 0) {
+//      return (0); //TODO(bhirschel) check why this is done
+//    }
+//  }
+
+  // Create the triangle
+  int triangle_count = 0;
+  Eigen::Vector4f triangle[3];
+  for (int i = 0; triTable[cubeindex][i] != -1; i += 3) {
+//    triangle[0] = vertlist[triTable[cubeindex][i]];
+//    triangle[1] = vertlist[triTable[cubeindex][i + 1]];
+//    triangle[2] = vertlist[triTable[cubeindex][i + 2]];
+    triangle[0].x() = vertlist[triTable[cubeindex][i]].x() * float(0.606);
+    triangle[1].x() = vertlist[triTable[cubeindex][i + 1]].x() * float(0.606);
+    triangle[2].x() = vertlist[triTable[cubeindex][i + 2]].x() * float(0.606);
+    triangle[0].y() = vertlist[triTable[cubeindex][i]].y() * float(0.505);
+    triangle[1].y() = vertlist[triTable[cubeindex][i + 1]].y() * float(0.505);
+    triangle[2].y() = vertlist[triTable[cubeindex][i + 2]].y() * float(0.505);
+    triangle[0].w() = 1.0f; // intensity
+    triangle[1].w() = 1.0f;
+    triangle[2].w() = 1.0f;
+    cloud.push_back(triangle[0]);
+    cloud.push_back(triangle[1]);
+    cloud.push_back(triangle[2]);
+    triangle_count++;
+  }
+  return (triangle_count);
+
+}
+
+
 sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
   ::cartographer::mapping::MapById<
       ::cartographer::mapping::SubmapId,
@@ -539,28 +726,56 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
     const ::cartographer::mapping::HybridGridTSDF* tsdf =
         static_cast<const ::cartographer::mapping::HybridGridTSDF*>(
             &submap3d->high_resolution_hybrid_grid());
-    std::vector<Eigen::Array4f> cells;
+    std::vector<Eigen::Array4f> ptrCloud;
+    int count = 0;
+    float isolevel = 0.05;
+
     for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf);
          !it.Done(); it.Next()) {
       const ::cartographer::mapping::TSDFVoxel voxel = it.GetValue();
       const float tsd = tsdf->ValueConverter().ValueToTSD(voxel.discrete_tsd);
-      const Eigen::Vector3f cell_center_submap =
-          tsdf->GetCenterOfCell(it.GetCellIndex());
-//      const Eigen::Vector3f cell_center_global =
-//          submap3d->local_pose().cast<float>() * cell_center_submap;
-      if ((std::abs(cell_center_submap.z() - 1.0f) < 0.04) ||
-          (std::abs(cell_center_submap.x()) < 0.04) ||
-          (std::abs(cell_center_submap.y()) < 0.04)) {
-        Eigen::Vector3f transformed_cell =
-            submap3d->local_pose().cast<float>() * cell_center_submap;
-        cells.emplace_back(transformed_cell[0], transformed_cell[1],
-                           transformed_cell[2], tsd);
+      // Need the tsdf value and index at every vertice!
+      const Eigen::Vector3f cell_center_submap = tsdf->GetCenterOfCell(it.GetCellIndex());
+      const Eigen::Vector3f cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
+      float resolution = tsdf->resolution();
+
+      int position_arr[8][3] = {{0, 0, 1},
+                                {1, 0, 1},
+                                {1, 0, 0},
+                                {0, 0, 0},
+                                {0, 1, 1},
+                                {1, 1, 1},
+                                {1, 1, 0},
+                                {0, 1, 0}};
+      Cube my_cube;
+      for (int i = 0; i < 8; ++i) {
+        my_cube.vertice_ids[i] = it.GetCellIndex();
+        my_cube.vertice_ids[i].x() += position_arr[i][0];
+        my_cube.vertice_ids[i].y() += position_arr[i][1];
+        my_cube.vertice_ids[i].z() += position_arr[i][2];
+        my_cube.vertice_pos_global[i] = cell_center_global;
+        my_cube.vertice_pos_global[i].x() += static_cast<float>(position_arr[i][0]) * (resolution / 2.0f);
+        my_cube.vertice_pos_global[i].y() += static_cast<float>(position_arr[i][1]) * (resolution / 2.0f);
+        my_cube.vertice_pos_global[i].z() += static_cast<float>(position_arr[i][2]) * (resolution / 2.0f);
+        my_cube.values[i] = tsdf->GetTSD(my_cube.vertice_ids[i]);
       }
+      count += process_cube(my_cube, ptrCloud, isolevel);
+
+//      if ((std::abs(cell_center_submap.z() - 1.0f) < 0.04) ||
+//          (std::abs(cell_center_submap.x()) < 0.04) ||
+//          (std::abs(cell_center_submap.y()) < 0.04)) {
+      /*if (tsd <= 0.05 && tsd >= -0.05) {
+          Eigen::Vector3f transformed_cell =
+              submap3d->local_pose().cast<float>() * cell_center_submap;
+          cells.emplace_back(transformed_cell[0], transformed_cell[1],
+                             transformed_cell[2], tsd);
+    }*/
     }
+    LOG(INFO) << "A total of " << count << " triangles are processed. Points in CLoud: " << ptrCloud.size();
 
     msg = ToPointCloud2Message(
         ::cartographer::common::ToUniversal(FromRos(::ros::Time::now())),
-        "world_cartographer", cells);
+        "world_cartographer", ptrCloud);
   }
 
   return msg;
