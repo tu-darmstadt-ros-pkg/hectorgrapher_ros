@@ -62,6 +62,7 @@
   <depend>tf2_ros</depend>
   <depend>urdf</depend>
   <depend>visualization_msgs</depend>
+  <depend>voxblox_msgs</depend>
 
   <test_depend>rosunit</test_depend>
 

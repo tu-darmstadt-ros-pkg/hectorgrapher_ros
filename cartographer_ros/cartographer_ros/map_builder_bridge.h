@@ -37,6 +37,9 @@
 #include "cartographer_ros_msgs/TrajectoryQuery.h"
 #include "geometry_msgs/TransformStamped.h"
 #include "nav_msgs/OccupancyGrid.h"
+#include "voxblox_msgs/Mesh.h"
+#include "pcl/point_cloud.h"
+#include "pcl/point_representation.h"
 
 // Abseil unfortunately pulls in winnt.h, which #defines DELETE.
 // Clean up to unbreak visualization_msgs::Marker::DELETE.
@@ -102,12 +105,12 @@ class MapBuilderBridge {
 
     struct Cube {
         Eigen::Vector3i vertice_ids[8];
-        Eigen::Vector3f vertice_pos_global[8];
+        pcl::PointXYZ vertice_pos_global[8];
         float values[8]{};
     };
-  Eigen::Vector3f VertexInterp(float isolevel, Eigen::Vector3f p1, Eigen::Vector3f p2,float valp1, float valp2);
-  int process_cube(Cube grid, std::vector<Eigen::Array4f> &cloud, float isolevel);
-  sensor_msgs::PointCloud2 GetTSDF();
+  pcl::PointXYZ VertexInterp(float isolevel, pcl::PointXYZ p1, pcl::PointXYZ p2,float valp1, float valp2);
+  int process_cube(Cube grid, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, float isolevel);
+  visualization_msgs::Marker GetTSDF();
 
   SensorBridge* sensor_bridge(int trajectory_id);
   std::unique_ptr<cartographer::mapping::MapBuilderInterface> map_builder_;

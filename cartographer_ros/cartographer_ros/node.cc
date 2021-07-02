@@ -135,7 +135,7 @@ Node::Node(
       kReadMetricsServiceName, &Node::HandleReadMetrics, this));
   service_servers_.push_back(node_handle_.advertiseService(
       kEnableMapUpdateServiceName, &Node::HandleEnableMapUpdateState, this));
-  tsdf_map_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>(
+  tsdf_map_publisher_ = node_handle_.advertise<::visualization_msgs::Marker>(
       kTSDFTopic, kLatestOnlyPublisherQueueSize);
   scan_matched_point_cloud_publisher_ =
       node_handle_.advertise<sensor_msgs::PointCloud2>(
@@ -424,7 +424,10 @@ void Node::PublishConstraintList(
 void Node::PublishTSDF(const ::ros::WallTimerEvent& unused_timer_event) {
   if (tsdf_map_publisher_.getNumSubscribers() > 0) {
     absl::MutexLock lock(&mutex_);
-    tsdf_map_publisher_.publish(map_builder_bridge_.GetTSDF());
+    auto msg = map_builder_bridge_.GetTSDF();
+    LOG(INFO) << "About to send!";
+    tsdf_map_publisher_.publish(msg);
+    LOG(INFO) << "I'm here";
   }
 }
 
