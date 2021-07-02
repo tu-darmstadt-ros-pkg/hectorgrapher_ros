@@ -109,7 +109,7 @@ class MapBuilderBridge {
         float values[8]{};
     };
   pcl::PointXYZ VertexInterp(float isolevel, pcl::PointXYZ p1, pcl::PointXYZ p2,float valp1, float valp2);
-  int process_cube(Cube grid, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, float isolevel);
+  int process_cube(Cube grid, pcl::PointCloud<pcl::PointXYZ> &cloud, float isolevel);
   visualization_msgs::Marker GetTSDF();
 
   SensorBridge* sensor_bridge(int trajectory_id);

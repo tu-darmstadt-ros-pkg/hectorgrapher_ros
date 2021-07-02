@@ -425,9 +425,7 @@ void Node::PublishTSDF(const ::ros::WallTimerEvent& unused_timer_event) {
   if (tsdf_map_publisher_.getNumSubscribers() > 0) {
     absl::MutexLock lock(&mutex_);
     auto msg = map_builder_bridge_.GetTSDF();
-    LOG(INFO) << "About to send!";
     tsdf_map_publisher_.publish(msg);
-    LOG(INFO) << "I'm here";
   }
 }
 

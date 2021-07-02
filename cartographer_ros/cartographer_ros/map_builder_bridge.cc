@@ -531,8 +531,8 @@ visualization_msgs::MarkerArray MapBuilderBridge::GetConstraintList() {
 pcl::PointXYZ MapBuilderBridge::VertexInterp(float isolevel,
                                              pcl::PointXYZ p1,
                                              pcl::PointXYZ p2,
-                                               float valp1,
-                                               float valp2) {
+                                             float valp1,
+                                             float valp2) {
   float mu;
   pcl::PointXYZ p;
 
@@ -559,7 +559,7 @@ pcl::PointXYZ MapBuilderBridge::VertexInterp(float isolevel,
 }
 
 int MapBuilderBridge::process_cube(Cube my_cube,
-                                   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
+                                   pcl::PointCloud<pcl::PointXYZ> &cloud,
                                    float isolevel) {
   int cubeindex = 0;
   if (my_cube.values[0] <= isolevel) cubeindex |= 1;
@@ -683,11 +683,6 @@ int MapBuilderBridge::process_cube(Cube my_cube,
                      my_cube.values[3],
                      my_cube.values[7]);
   }
-//  for (int i = 0; i < 12; i++) {
-//    if (vertlist[i].x() < 0) {
-//      return (0); //TODO(bhirschel) check why this is done
-//    }
-//  }
 
   // Create the triangle
   int triangle_count = 0;
@@ -696,18 +691,18 @@ int MapBuilderBridge::process_cube(Cube my_cube,
     triangle[0] = vertlist[triTable[cubeindex][i]];
     triangle[1] = vertlist[triTable[cubeindex][i + 1]];
     triangle[2] = vertlist[triTable[cubeindex][i + 2]];
-    triangle[0].x *= float(0.606);
-    triangle[1].x *= float(0.606);
-    triangle[2].x *= float(0.606);
-    triangle[0].y *= float(0.505);
-    triangle[1].y *= float(0.505);
-    triangle[2].y *= float(0.505);
+//    triangle[0].x *= 0.606f;
+//    triangle[1].x *= 0.606f;
+//    triangle[2].x *= 0.606f;
+//    triangle[0].y *= 0.505f;
+//    triangle[1].y *= 0.505f;
+//    triangle[2].y *= 0.505f;
 //    triangle[0].intensity = 1.0f; // intensity
 //    triangle[1].intensity = 1.0f;
 //    triangle[2].intensity = 1.0f;
-    cloud->push_back(triangle[0]);
-    cloud->push_back(triangle[1]);
-    cloud->push_back(triangle[2]);
+    cloud.push_back(triangle[0]);
+    cloud.push_back(triangle[1]);
+    cloud.push_back(triangle[2]);
     triangle_count++;
   }
   return (triangle_count);
@@ -722,6 +717,7 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDF() {
       data = map_builder_->pose_graph()->GetAllSubmapData();
   sensor_msgs::PointCloud2 msg;
   visualization_msgs::Marker marker;
+
   if (!data.empty()) {
     const ::cartographer::mapping::Submap3D* submap3d =
         static_cast<const ::cartographer::mapping::Submap3D*>(
@@ -730,9 +726,12 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDF() {
         static_cast<const ::cartographer::mapping::HybridGridTSDF*>(
             &submap3d->high_resolution_hybrid_grid());
     pcl::PointCloud<pcl::PointXYZ> cloud;
-    pcl::PointCloud<pcl::PointXYZ>::Ptr ptrCloud(&cloud);
-    pcl::PolygonMesh  triangleMesh;
-    pcl::PolygonMesh::Ptr ptrMesh(&triangleMesh);
+    auto local_trajectory_data = GetLocalTrajectoryData();
+    LOG(INFO) << "trajectory data size: " << local_trajectory_data.size();
+    auto local_position = local_trajectory_data[0].local_slam_data->local_pose.translation();
+//    pcl::PointCloud<pcl::PointXYZ>::Ptr ptrCloud(&cloud);
+//    pcl::PolygonMesh triangleMesh;
+//    pcl::PolygonMesh::Ptr ptrMesh(&triangleMesh);
     int count = 0;
 
     for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf);
@@ -742,6 +741,10 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDF() {
       // Need the tsdf value and index at every vertice!
       const Eigen::Vector3f cell_center_submap = tsdf->GetCenterOfCell(it.GetCellIndex());
       const Eigen::Vector3f cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
+
+      if ((local_position.cast<float>() - cell_center_global).norm() > 2.0f) {
+        continue;
+      }
 
       float resolution = tsdf->resolution();
       float isolevel = resolution;
@@ -760,12 +763,12 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDF() {
         my_cube.vertice_ids[i].x() += position_arr[i][0];
         my_cube.vertice_ids[i].y() += position_arr[i][1];
         my_cube.vertice_ids[i].z() += position_arr[i][2];
-        my_cube.vertice_pos_global[i].x = cell_center_global.x() + static_cast<float>(position_arr[i][0]) * (resolution / 2.0f);
-        my_cube.vertice_pos_global[i].y = cell_center_global.y() + static_cast<float>(position_arr[i][1]) * (resolution / 2.0f);
-        my_cube.vertice_pos_global[i].z = cell_center_global.z() + static_cast<float>(position_arr[i][2]) * (resolution / 2.0f);
+        my_cube.vertice_pos_global[i].x = cell_center_global.x() + static_cast<float>(position_arr[i][0]) * (resolution / 1.0f);
+        my_cube.vertice_pos_global[i].y = cell_center_global.y() + static_cast<float>(position_arr[i][1]) * (resolution / 1.0f);
+        my_cube.vertice_pos_global[i].z = cell_center_global.z() + static_cast<float>(position_arr[i][2]) * (resolution / 1.0f);
         my_cube.values[i] = tsdf->GetTSD(my_cube.vertice_ids[i]);
       }
-      count += process_cube(my_cube, ptrCloud, isolevel);
+      count += process_cube(my_cube, cloud, isolevel);
 
 //      if ((std::abs(cell_center_submap.z() - 1.0f) < 0.04) ||
 //          (std::abs(cell_center_submap.x()) < 0.04) ||
@@ -777,22 +780,22 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDF() {
                              transformed_cell[2], tsd);
     }*/
     }
-    LOG(INFO) << "A total of " << count << " triangles are processed. Points in Cloud: " << ptrCloud->size();
+    LOG(INFO) << "A total of " << count << " triangles are processed. Points in Cloud: " << cloud.size();
 
-    pcl::PolygonMesh Mesh;
-    pcl::PolygonMesh::Ptr mesh_ptr(&Mesh);
-    pcl::toPCLPointCloud2 (cloud, mesh_ptr->cloud);
-
-    for (uint32_t i = 0; i < count; i++)
-    {
-      pcl::Vertices v;
-      v.vertices.push_back (i*3 + 0);
-      v.vertices.push_back (i*3 + 1);
-      v.vertices.push_back (i*3 + 2);
-      mesh_ptr->polygons.push_back(v);
-    }
-
-    LOG(INFO) << "Number of Polygons: " << mesh_ptr->polygons.size();
+//    pcl::PolygonMesh Mesh;
+//    pcl::PolygonMesh::Ptr mesh_ptr(&Mesh);
+//    pcl::toPCLPointCloud2 (cloud, mesh_ptr->cloud);
+//
+//    for (uint32_t i = 0; i < count; i++)
+//    {
+//      pcl::Vertices v;
+//      v.vertices.push_back (i*3 + 0);
+//      v.vertices.push_back (i*3 + 1);
+//      v.vertices.push_back (i*3 + 2);
+//      mesh_ptr->polygons.push_back(v);
+//    }
+//
+//    LOG(INFO) << "Number of Polygons: " << mesh_ptr->polygons.size();
 
     std_msgs::ColorRGBA color;
     marker.header.frame_id = "world_cartographer";
@@ -810,12 +813,12 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDF() {
     marker.pose.orientation.z = 0.0;
     marker.pose.orientation.w = 1.0;
     color.a = 1;
-    color.r = 255;
-    color.g = 255;
-    color.b = 255;
+    color.r = 150;
+    color.g = 150;
+    color.b = 150;
     marker.color = color;
-//    marker.points.resize(ptrCloud->size());
-    size_t i = 0;
+    marker.points.resize(cloud.size());
+//    size_t i = 0;
 //    for (auto & vertice_group : mesh_ptr->polygons) {
 //      for (auto & vertice : vertice_group.vertices) {
 //        geometry_msgs::Point p;
@@ -825,18 +828,17 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDF() {
 //        marker.points.push_back(p);
 //      }
 //    }
-//    for (auto & cloud_point : cloud) {
-//      geometry_msgs::Point temp_point;
-//      temp_point.x = cloud_point.x;
-//      temp_point.y = cloud_point.y;
-//      temp_point.z = cloud_point.z;
-//      marker.points.push_back(temp_point);
-//    }
+    for (auto & cloud_point : cloud) {
+      geometry_msgs::Point temp_point;
+      temp_point.x = cloud_point.x;
+      temp_point.y = cloud_point.y;
+      temp_point.z = cloud_point.z;
+      marker.points.push_back(temp_point);
+    }
 
 //    msg = ToPointCloud2Message(
 //        ::cartographer::common::ToUniversal(FromRos(::ros::Time::now())),
 //        "world_cartographer", ptrCloud);
-    LOG(INFO) << "Marker prepared";
   }
 
   LOG(INFO) << "Ready to send marker with " << marker.points.size() << " points";
