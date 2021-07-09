@@ -103,14 +103,58 @@ class MapBuilderBridge {
   visualization_msgs::MarkerArray GetLandmarkPosesList();
   visualization_msgs::MarkerArray GetConstraintList();
 
-    struct Cube {
-        Eigen::Vector3i vertice_ids[8];
-        pcl::PointXYZ vertice_pos_global[8];
-        float weights[8]{};
-        float tsd_values[8]{};
-    };
-  pcl::PointXYZ VertexInterp(float isolevel, pcl::PointXYZ p1, pcl::PointXYZ p2,float valp1, float valp2);
-  int process_cube(Cube &my_cube, pcl::PointCloud<pcl::PointXYZ> &cloud, float isolevel);
+  /**
+   * Struct element representing a TSDF voxel - and in particular its neighbours - in 3D space.
+   * Stores the indices of all 8 neighbours, their absolute global position, their tsd weights and
+   * their tsd values. Neighbours are indexed according to an offset to the own CellIndex stored in
+   * position_arr.
+   */
+  struct Cube {
+    int position_arr[8][3] = {{0, 0, 1},
+                              {1, 0, 1},
+                              {1, 0, 0},
+                              {0, 0, 0},
+                              {0, 1, 1},
+                              {1, 1, 1},
+                              {1, 1, 0},
+                              {0, 1, 0}};
+    Eigen::Vector3i vertice_ids[8];
+    pcl::PointXYZ vertice_pos_global[8];
+    float tsd_weights[8]{};
+    float tsd_values[8]{};
+  };
+
+  /**
+   * Performs linear interpolation on two cube corners to find the approximate zero crossing
+   * (surface) value.
+   * @param isolevel value to represent an object collision in TSDF, standard is 0.0
+   * @param p1 Point 1 defining the edge
+   * @param p2 Point 2 defining the edge
+   * @param valp1 TSD value of point 1
+   * @param valp2 TSD value of point 2
+   * @return interpolated point with the zero crossing
+   */
+  pcl::PointXYZ InterpolateVertex(float isolevel,
+                                  pcl::PointXYZ p1,
+                                  pcl::PointXYZ p2,
+                                  float valp1,
+                                  float valp2);
+  /**
+   * Performs Marching Cubes on a MapBuilderBridge::Cube element representing a TSDF voxel in space.
+   * Every found zero-crossing on an edge is registered in the cloud as a 3D point, but always in
+   * triplets so that points 0-1-2, 3-4-5, etc. form a triangle represrnting the mesh surface.
+   * @param my_cube pointer to an MapBuilderBridge::Cube element representing a TSDF voxel
+   * @param cloud pointer to a PCL pointcloud to store the found triangle vertices
+   * @param isolevel value to represent an object collision in TSDF, standard is 0.0
+   * @return the number of triangles processed
+   */
+  int ProcessCube(Cube &my_cube, pcl::PointCloud<pcl::PointXYZ> &cloud, float isolevel);
+  /**
+   * Creates a mesh surface representation of the TSDF map within a certain cut-off-distance from
+   * the robot. Uses a visualization_msgs::Marker Triangle_List as representation in Rviz, where the
+   * colors are chosen according to the surface normals
+   * @return
+   */
   visualization_msgs::Marker GetTSDF();
 
   SensorBridge* sensor_bridge(int trajectory_id);
