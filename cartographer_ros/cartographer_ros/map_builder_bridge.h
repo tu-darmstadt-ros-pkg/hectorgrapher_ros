@@ -37,7 +37,6 @@
 #include "cartographer_ros_msgs/TrajectoryQuery.h"
 #include "geometry_msgs/TransformStamped.h"
 #include "nav_msgs/OccupancyGrid.h"
-#include "voxblox_msgs/Mesh.h"
 #include "pcl/point_cloud.h"
 #include "pcl/point_representation.h"
 

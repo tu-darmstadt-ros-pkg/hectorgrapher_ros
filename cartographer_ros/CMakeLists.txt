@@ -34,7 +34,6 @@ set(PACKAGE_DEPENDENCIES
   tf2_ros
   urdf
   visualization_msgs
-  voxblox_msgs
 )
 
 if(WIN32)
