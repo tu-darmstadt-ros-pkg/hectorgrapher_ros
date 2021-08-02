@@ -67,37 +67,37 @@ class MapBuilderBridge {
   };
 
   MapBuilderBridge(
-      const NodeOptions& node_options,
+      const NodeOptions &node_options,
       std::unique_ptr<cartographer::mapping::MapBuilderInterface> map_builder,
-      tf2_ros::Buffer* tf_buffer);
+      tf2_ros::Buffer *tf_buffer);
 
-  MapBuilderBridge(const MapBuilderBridge&) = delete;
-  MapBuilderBridge& operator=(const MapBuilderBridge&) = delete;
+  MapBuilderBridge(const MapBuilderBridge &) = delete;
+  MapBuilderBridge &operator=(const MapBuilderBridge &) = delete;
 
-  void LoadState(const std::string& state_filename, bool load_frozen_state);
+  void LoadState(const std::string &state_filename, bool load_frozen_state);
   int AddTrajectory(
       const std::set<
-          ::cartographer::mapping::TrajectoryBuilderInterface::SensorId>&
-          expected_sensor_ids,
-      const TrajectoryOptions& trajectory_options);
+          ::cartographer::mapping::TrajectoryBuilderInterface::SensorId> &
+      expected_sensor_ids,
+      const TrajectoryOptions &trajectory_options);
   void FinishTrajectory(int trajectory_id);
   void RunFinalOptimization();
-  bool SerializeState(const std::string& filename,
+  bool SerializeState(const std::string &filename,
                       const bool include_unfinished_submaps);
 
   void HandleSubmapQuery(
-      cartographer_ros_msgs::SubmapQuery::Request& request,
-      cartographer_ros_msgs::SubmapQuery::Response& response);
+      cartographer_ros_msgs::SubmapQuery::Request &request,
+      cartographer_ros_msgs::SubmapQuery::Response &response);
   void HandleTrajectoryQuery(
-      cartographer_ros_msgs::TrajectoryQuery::Request& request,
-      cartographer_ros_msgs::TrajectoryQuery::Response& response);
+      cartographer_ros_msgs::TrajectoryQuery::Request &request,
+      cartographer_ros_msgs::TrajectoryQuery::Response &response);
 
   std::map<int /* trajectory_id */,
            ::cartographer::mapping::PoseGraphInterface::TrajectoryState>
   GetTrajectoryStates();
   cartographer_ros_msgs::SubmapList GetSubmapList();
   std::unordered_map<int, LocalTrajectoryData> GetLocalTrajectoryData()
-      LOCKS_EXCLUDED(mutex_);
+  LOCKS_EXCLUDED(mutex_);
   visualization_msgs::MarkerArray GetTrajectoryNodeList();
   visualization_msgs::MarkerArray GetLandmarkPosesList();
   visualization_msgs::MarkerArray GetConstraintList();
@@ -126,6 +126,7 @@ class MapBuilderBridge {
   /**
    * Performs linear interpolation on two cube corners to find the approximate zero crossing
    * (surface) value.
+   * Implementation inspired by Isaac Zhang: https://github.com/zhangxiaoxuan1/tsdfprocessor/blob/cdbc42300a9f5a72411b052a04c7972cef30f3f5/marching_cubes.cpp
    * @param isolevel value to represent an object collision in TSDF, standard is 0.0
    * @param p1 Point 1 defining the edge
    * @param p2 Point 2 defining the edge
@@ -142,30 +143,38 @@ class MapBuilderBridge {
    * Performs Marching Cubes on a MapBuilderBridge::Cube element representing a TSDF voxel in space.
    * Every found zero-crossing on an edge is registered in the cloud as a 3D point, but always in
    * triplets so that points 0-1-2, 3-4-5, etc. form a triangle represrnting the mesh surface.
-   * @param my_cube pointer to an MapBuilderBridge::Cube element representing a TSDF voxel
+   * Implementation inspired by Isaac Zhang: https://github.com/zhangxiaoxuan1/tsdfprocessor/blob/cdbc42300a9f5a72411b052a04c7972cef30f3f5/marching_cubes.cpp
+   * @param cube pointer to an MapBuilderBridge::Cube element representing a TSDF voxel
    * @param cloud pointer to a PCL pointcloud to store the found triangle vertices
    * @param isolevel value to represent an object collision in TSDF, standard is 0.0
    * @return the number of triangles processed
    */
-  int ProcessCube(Cube &my_cube, pcl::PointCloud<pcl::PointXYZ> &cloud, float isolevel);
+  int ProcessCube(Cube &cube, pcl::PointCloud<pcl::PointXYZ> &cloud, float isolevel);
   /**
    * Creates a mesh surface representation of the TSDF map within a certain cut-off-distance from
    * the robot. Uses a visualization_msgs::Marker Triangle_List as representation in Rviz, where the
    * colors are chosen according to the surface normals
-   * @return
+   * @return visualization_msgs::Marker
    */
-  visualization_msgs::Marker GetTSDF();
+  visualization_msgs::Marker GetTSDFMesh();
 
-  SensorBridge* sensor_bridge(int trajectory_id);
+  /**
+   * Creates a surface representation of the TSDF map as points within a certain cut-off distance
+   * from the robot. Intensity channel is used as TSD value.
+   * @return sensor_msgs::PointCloud2
+   */
+  sensor_msgs::PointCloud2 GetTSDF();
+
+  SensorBridge *sensor_bridge(int trajectory_id);
   std::unique_ptr<cartographer::mapping::MapBuilderInterface> map_builder_;
-  tf2_ros::Buffer* const tf_buffer_;
+  tf2_ros::Buffer *const tf_buffer_;
 
  private:
   void OnLocalSlamResult(const int trajectory_id,
                          const ::cartographer::common::Time time,
                          const ::cartographer::transform::Rigid3d local_pose,
                          ::cartographer::sensor::RangeData range_data_in_local)
-      LOCKS_EXCLUDED(mutex_);
+  LOCKS_EXCLUDED(mutex_);
 
   absl::Mutex mutex_;
   const NodeOptions node_options_;
@@ -180,7 +189,7 @@ class MapBuilderBridge {
   std::unordered_map<int, std::unique_ptr<SensorBridge>> sensor_bridges_;
   std::unordered_map<int, size_t> trajectory_to_highest_marker_id_;
 
-  int edgeTable[256] = {
+  int edge_table_[256] = {
       0x0, 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
       0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,
       0x190, 0x99, 0x393, 0x29a, 0x596, 0x49f, 0x795, 0x69c,
@@ -214,7 +223,7 @@ class MapBuilderBridge {
       0xf00, 0xe09, 0xd03, 0xc0a, 0xb06, 0xa0f, 0x905, 0x80c,
       0x70c, 0x605, 0x50f, 0x406, 0x30a, 0x203, 0x109, 0x0};
 
-  int triTable[256][16] =
+  int triangle_table_[256][16] =
       {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
        {0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
        {0, 1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
