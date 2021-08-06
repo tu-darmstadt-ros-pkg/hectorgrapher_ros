@@ -62,7 +62,24 @@ struct PointXYZIT {
   float unused_padding[2];
 };
 
+struct PointXYZOuster {
+  PCL_ADD_POINT4D;
+  float intensity;
+  std::uint32_t time;
+  std::uint16_t reflectivity;
+  std::uint8_t ring;
+  std::uint16_t ambient;
+  std::uint32_t range;
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
 }  // namespace
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(
+    PointXYZOuster,
+    (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(
+        std::uint32_t, time, t)(std::uint16_t, reflectivity, reflectivity)(
+        std::uint8_t, ring, ring)(std::uint16_t, ambient,
+                                  ambient)(std::uint32_t, range, range))
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
     PointXYZT, (float, x, x)(float, y, y)(float, z, z)(float, time, time))
@@ -257,13 +274,40 @@ ToPointCloudWithIntensities(const sensor_msgs::MultiEchoLaserScan& msg) {
 std::tuple<::cartographer::sensor::PointCloudWithIntensities,
            ::cartographer::common::Time>
 ToStructuredPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
+  PointCloudWithIntensities point_cloud;
   bool has_intensities = PointCloud2HasField(msg, "intensity");
   bool has_time = PointCloud2HasField(msg, "time");
+  bool has_range = PointCloud2HasField(msg, "range");
   const unsigned int num_points = msg.width * msg.height;
+
+  // Ouster format
+  if (has_range) {
+    pcl::PointCloud<PointXYZOuster> input_cloud;
+    pcl::fromROSMsg(msg, input_cloud);
+    CHECK_EQ(num_points, input_cloud.points.size());
+    point_cloud.points.resize(
+        num_points, {Eigen::Vector3f{std::numeric_limits<float>::quiet_NaN(),
+                                     std::numeric_limits<float>::quiet_NaN(),
+                                     std::numeric_limits<float>::quiet_NaN()},
+                     std::numeric_limits<float>::quiet_NaN()});
+    point_cloud.intensities.resize(num_points, 0.f);
+    point_cloud.width = input_cloud.width;
+    int index = 0;
+    for (const auto& pcl_point : input_cloud.points) {
+      float point_time = pcl_point.time * 1.0E-9;
+      point_cloud.points[index] = {
+          Eigen::Vector3f{pcl_point.x, pcl_point.y, pcl_point.z}, point_time};
+      point_cloud.intensities[index] =
+          has_intensities ? pcl_point.intensity : 0.f;
+      ++index;
+    }
+    ::cartographer::common::Time timestamp = FromRos(msg.header.stamp);
+    return std::make_tuple(point_cloud, timestamp);
+  }
+
   pcl::PointCloud<PointXYZIT> input_cloud;
   pcl::fromROSMsg(msg, input_cloud);
   CHECK_EQ(num_points, input_cloud.points.size());
-  PointCloudWithIntensities point_cloud;
   point_cloud.points.resize(
       num_points, {Eigen::Vector3f{std::numeric_limits<float>::quiet_NaN(),
                                    std::numeric_limits<float>::quiet_NaN(),
@@ -338,10 +382,39 @@ std::tuple<::cartographer::sensor::PointCloudWithIntensities,
            ::cartographer::common::Time>
 ToPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
   PointCloudWithIntensities point_cloud;
+  bool has_intensities = PointCloud2HasField(msg, "intensity");
+  bool has_time = PointCloud2HasField(msg, "time");
+  bool has_range = PointCloud2HasField(msg, "range");
+  const unsigned int num_points = msg.width * msg.height;
+
+  // Ouster format
+  if (has_range) {
+    pcl::PointCloud<PointXYZOuster> input_cloud;
+    pcl::fromROSMsg(msg, input_cloud);
+    CHECK_EQ(num_points, input_cloud.points.size());
+    point_cloud.points.resize(
+        num_points, {Eigen::Vector3f{std::numeric_limits<float>::quiet_NaN(),
+                                     std::numeric_limits<float>::quiet_NaN(),
+                                     std::numeric_limits<float>::quiet_NaN()},
+                     std::numeric_limits<float>::quiet_NaN()});
+    point_cloud.intensities.resize(num_points, 0.f);
+    point_cloud.width = input_cloud.width;
+    int index = 0;
+    for (const auto& pcl_point : input_cloud.points) {
+      point_cloud.points[index] = {
+          Eigen::Vector3f{pcl_point.x, pcl_point.y, pcl_point.z}};
+      point_cloud.intensities[index] =
+          has_intensities ? pcl_point.intensity : 0.f;
+      ++index;
+    }
+    ::cartographer::common::Time timestamp = FromRos(msg.header.stamp);
+    return std::make_tuple(point_cloud, timestamp);
+  }
+
   // We check for intensity field here to avoid run-time warnings if we pass in
   // a PointCloud2 without intensity.
-  if (PointCloud2HasField(msg, "intensity")) {
-    if (PointCloud2HasField(msg, "time")) {
+  if (has_intensities) {
+    if (has_time) {
       pcl::PointCloud<PointXYZIT> pcl_point_cloud;
       pcl::fromROSMsg(msg, pcl_point_cloud);
       point_cloud.points.reserve(pcl_point_cloud.size());
@@ -364,7 +437,7 @@ ToPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
     }
   } else {
     // If we don't have an intensity field, just copy XYZ and fill in 1.0f.
-    if (PointCloud2HasField(msg, "time")) {
+    if (has_time) {
       pcl::PointCloud<PointXYZT> pcl_point_cloud;
       pcl::fromROSMsg(msg, pcl_point_cloud);
       point_cloud.points.reserve(pcl_point_cloud.size());
