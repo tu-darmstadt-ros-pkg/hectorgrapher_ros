@@ -32,6 +32,7 @@ constexpr char kNavSatFixTopic[] = "fix";
 constexpr char kLandmarkTopic[] = "landmark";
 constexpr char kFinishTrajectoryServiceName[] = "finish_trajectory";
 constexpr char kOccupancyGridTopic[] = "map";
+constexpr char kTSDFMeshTopic[] = "tsdf_mesh";
 constexpr char kTSDFTopic[] = "tsdf";
 constexpr char kScanMatchedPointCloudTopic[] = "scan_matched_points2";
 constexpr char kSubmapListTopic[] = "submap_list";
