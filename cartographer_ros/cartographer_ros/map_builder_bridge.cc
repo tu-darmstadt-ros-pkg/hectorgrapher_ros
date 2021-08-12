@@ -715,7 +715,7 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
 
     float resolution = tsdf->resolution();
     float isolevel = 0.0f;
-    int count = 0;
+    size_t count = 0;
 
     for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf);
          !it.Done(); it.Next()) {
@@ -768,7 +768,7 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
     pcl::PolygonMesh mesh;
     pcl::toPCLPointCloud2(cloud, mesh.cloud);
 
-    for (uint32_t i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++) {
       pcl::Vertices v;
       v.vertices.push_back(i * 3 + 0);
       v.vertices.push_back(i * 3 + 1);
