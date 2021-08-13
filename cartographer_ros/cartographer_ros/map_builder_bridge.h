@@ -21,6 +21,9 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <pcl/PolygonMesh.h>
+#include <pcl/conversions.h>
+#include <pcl/point_types.h>
 
 #include "absl/synchronization/mutex.h"
 #include "cartographer/mapping/map_builder_interface.h"
@@ -157,6 +160,10 @@ class MapBuilderBridge {
    * @return visualization_msgs::Marker
    */
   visualization_msgs::Marker GetTSDFMesh();
+
+  void ProcessTSDFMesh(pcl::PolygonMesh &mesh, float cut_off_distance, float cut_off_height);
+
+  bool WriteTSDFMesh(const std::string &filename);
 
   /**
    * Creates a surface representation of the TSDF map as points within a certain cut-off distance

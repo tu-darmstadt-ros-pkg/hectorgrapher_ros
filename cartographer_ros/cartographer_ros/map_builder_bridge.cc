@@ -695,12 +695,11 @@ int MapBuilderBridge::ProcessCube(Cube &cube,
 
 }
 
-visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
+void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh, float cut_off_distance, float cut_off_height) {
   ::cartographer::mapping::MapById<
-      ::cartographer::mapping::SubmapId,
-      ::cartographer::mapping::PoseGraphInterface::SubmapData>
-      data = map_builder_->pose_graph()->GetAllSubmapData();
-  visualization_msgs::Marker marker;
+  ::cartographer::mapping::SubmapId,
+  ::cartographer::mapping::PoseGraphInterface::SubmapData>
+  data = map_builder_->pose_graph()->GetAllSubmapData();
 
   if (!data.empty()) {
     const auto submap3d =
@@ -718,27 +717,27 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
     size_t count = 0;
 
     for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf);
-         !it.Done(); it.Next()) {
+    !it.Done(); it.Next()) {
       const ::cartographer::mapping::TSDFVoxel voxel = it.GetValue();
       const float tsd = tsdf->ValueConverter().ValueToTSD(voxel.discrete_tsd);
       const Eigen::Vector3f cell_center_submap = tsdf->GetCenterOfCell(it.GetCellIndex());
       const Eigen::Vector3f
-          cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
+      cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
 
       if (voxel.discrete_weight == 0) {
         // Skip inner-object voxels
         continue;
       }
 
-      if ((robot_position.cast<float>() - cell_center_global).norm()
-          > static_cast<float>(cartographer_ros::kTsdfMeshCutOffDistance)) {
-        // Cut-off cells that are too far away from the robot
+      if (cut_off_distance >= 0.0f &&
+      (robot_position.cast<float>() - cell_center_global).norm() > cut_off_distance) {
+        // Cut-off cells that are too far away from the robot, if parameter valid (>0)
         continue;
       }
 
-      if (cell_center_global.z() - static_cast<float>(robot_position.z())
-          > static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight)) {
-        // Cut-off cells that are too high above the robot
+      if (cut_off_height >= 0.0f &&
+      cell_center_global.z() - static_cast<float>(robot_position.z()) > cut_off_height) {
+        // Cut-off cells that are too high above the robot, if parameter valid (>0)
         continue;
       }
 
@@ -763,9 +762,8 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
 
     }
     LOG(INFO) << "A total of " << count << " triangles are processed. Points in Cloud: "
-              << cloud.size();
+    << cloud.size();
 
-    pcl::PolygonMesh mesh;
     pcl::toPCLPointCloud2(cloud, mesh.cloud);
 
     for (size_t i = 0; i < count; i++) {
@@ -775,50 +773,92 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
       v.vertices.push_back(i * 3 + 2);
       mesh.polygons.push_back(v);
     }
+  }
+}
 
-    std_msgs::ColorRGBA color;
-    marker.header.frame_id = "world_cartographer";
-    marker.header.stamp = ::ros::Time::now();
-    marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.scale.x = 1.0;
-    marker.scale.y = 1.0;
-    marker.scale.z = 1.0;
-    marker.pose.position.x = 0.0;
-    marker.pose.position.y = 0.0;
-    marker.pose.position.z = 0.0;
-    marker.pose.orientation.x = 0.0;
-    marker.pose.orientation.y = 0.0;
-    marker.pose.orientation.z = 0.0;
-    marker.pose.orientation.w = 1.0;
+visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
+  visualization_msgs::Marker marker;
+  pcl::PolygonMesh mesh;
+  ProcessTSDFMesh(mesh, static_cast<float>(cartographer_ros::kTsdfMeshCutOffDistance), static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight));
 
-    for (auto &vertice_group : mesh.polygons) {
-      for (auto &vertice : vertice_group.vertices) {
-        geometry_msgs::Point temp_point;
-        temp_point.x = cloud[vertice].x;
-        temp_point.y = cloud[vertice].y;
-        temp_point.z = cloud[vertice].z;
-        marker.points.push_back(temp_point);
-      }
-      Eigen::Vector3f u = {cloud[vertice_group.vertices[1]].x - cloud[vertice_group.vertices[0]].x,
-                           cloud[vertice_group.vertices[1]].y - cloud[vertice_group.vertices[0]].y,
-                           cloud[vertice_group.vertices[1]].z - cloud[vertice_group.vertices[0]].z};
-      Eigen::Vector3f v = {cloud[vertice_group.vertices[2]].x - cloud[vertice_group.vertices[0]].x,
-                           cloud[vertice_group.vertices[2]].y - cloud[vertice_group.vertices[0]].y,
-                           cloud[vertice_group.vertices[2]].z - cloud[vertice_group.vertices[0]].z};
-      Eigen::Vector3f normal = u.cross(v).normalized();
-      std_msgs::ColorRGBA surface_color;
-      surface_color.r = (normal.x() + 1.0f) * 0.5f;
-      surface_color.g = (normal.y() + 1.0f) * 0.5f;
-      surface_color.b = (normal.z() + 1.0f) * 0.5f;
-      surface_color.a = 1;
-      marker.colors.push_back(surface_color);
-      marker.colors.push_back(surface_color);
-      marker.colors.push_back(surface_color);
+  std_msgs::ColorRGBA color;
+  marker.header.frame_id = "world_cartographer";
+  marker.header.stamp = ::ros::Time::now();
+  marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.scale.x = 1.0;
+  marker.scale.y = 1.0;
+  marker.scale.z = 1.0;
+  marker.pose.position.x = 0.0;
+  marker.pose.position.y = 0.0;
+  marker.pose.position.z = 0.0;
+  marker.pose.orientation.x = 0.0;
+  marker.pose.orientation.y = 0.0;
+  marker.pose.orientation.z = 0.0;
+  marker.pose.orientation.w = 1.0;
+
+  pcl::PointCloud<pcl::PointXYZ> cloud;
+  pcl::fromPCLPointCloud2(mesh.cloud, cloud);
+
+  for (auto &vertice_group : mesh.polygons) {
+    for (auto &vertice : vertice_group.vertices) {
+      geometry_msgs::Point temp_point;
+      temp_point.x = cloud[vertice].x;
+      temp_point.y = cloud[vertice].y;
+      temp_point.z = cloud[vertice].z;
+      marker.points.push_back(temp_point);
     }
+    Eigen::Vector3f u = {cloud[vertice_group.vertices[1]].x - cloud[vertice_group.vertices[0]].x,
+                         cloud[vertice_group.vertices[1]].y - cloud[vertice_group.vertices[0]].y,
+                         cloud[vertice_group.vertices[1]].z - cloud[vertice_group.vertices[0]].z};
+    Eigen::Vector3f v = {cloud[vertice_group.vertices[2]].x - cloud[vertice_group.vertices[0]].x,
+                         cloud[vertice_group.vertices[2]].y - cloud[vertice_group.vertices[0]].y,
+                         cloud[vertice_group.vertices[2]].z - cloud[vertice_group.vertices[0]].z};
+    Eigen::Vector3f normal = u.cross(v).normalized();
+    std_msgs::ColorRGBA surface_color;
+    surface_color.r = (normal.x() + 1.0f) * 0.5f;
+    surface_color.g = (normal.y() + 1.0f) * 0.5f;
+    surface_color.b = (normal.z() + 1.0f) * 0.5f;
+    surface_color.a = 1;
+    marker.colors.push_back(surface_color);
+    marker.colors.push_back(surface_color);
+    marker.colors.push_back(surface_color);
   }
 
   return marker;
+}
+
+bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename) {
+  pcl::PolygonMesh mesh;
+  ProcessTSDFMesh(mesh, -1.0f, -1.0f);
+
+  pcl::PointCloud<pcl::PointXYZ> cloud;
+  pcl::fromPCLPointCloud2(mesh.cloud, cloud);
+
+  std::ofstream myfile (filename +".ply");
+  myfile << "ply\n";
+  myfile << "format ascii 1.0\n";
+  myfile << "comment Created by Cartographer \n";
+  myfile << "element vertex " << cloud.size() <<"\n";
+  myfile << "property float x \n";
+  myfile << "property float y \n";
+  myfile << "property float z \n";
+  myfile << "element face " << mesh.polygons.size() <<"\n";
+  myfile << "property list uchar uint vertex_indices \n";
+  myfile << "end_header \n";
+  for(auto & p : cloud.points) {
+    myfile << p.x << " " << p.y << " " << p.z << "\n";
+  }
+  for (auto &vertice_group : mesh.polygons) {
+    myfile << 3 << " " <<  vertice_group.vertices[0] << " " << vertice_group.vertices[1] << " " << vertice_group.vertices[2] << "\n";
+  }
+//  for(auto & t : mesh.polygons) {
+//    myfile << 3 << " " <<  t[0] << " " << t[1] << " " << t[2] << "\n";
+//  }
+  myfile.close();
+  LOG(INFO)<<"wrote file";
+
+  return true;
 }
 
 sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {

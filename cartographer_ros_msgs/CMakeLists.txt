@@ -52,6 +52,7 @@ add_service_files(
     SubmapQuery.srv
     TrajectoryQuery.srv
     WriteState.srv
+    WriteTsdfMesh.srv
 )
 
 generate_messages(
