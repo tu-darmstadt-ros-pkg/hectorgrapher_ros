@@ -22,6 +22,9 @@
 #include "gflags/gflags.h"
 #include "std_msgs/String.h"
 #include "tf2_ros/transform_listener.h"
+#include <dynamic_reconfigure/server.h>
+#include <cartographer_ros/dynamic_parametersConfig.h>
+#include "cartographer_ros/node_dynamic_parameters.h"
 
 DEFINE_bool(collect_metrics, false,
             "Activates the collection of runtime metrics. If activated, the "
@@ -120,6 +123,12 @@ int main(int argc, char** argv) {
 
   ::ros::init(argc, argv, "cartographer_node");
   ::ros::start();
+
+  dynamic_reconfigure::Server<cartographer_ros::dynamic_parametersConfig> server;
+  dynamic_reconfigure::Server<cartographer_ros::dynamic_parametersConfig>::CallbackType f;
+
+  f = boost::bind(&cartographer_ros::dynamic_reconfigure_callback, _1, _2);
+  server.setCallback(f);
 
   cartographer_ros::ScopedRosLogSink ros_log_sink;
   cartographer_ros::NodeWrapper node_wrapper;

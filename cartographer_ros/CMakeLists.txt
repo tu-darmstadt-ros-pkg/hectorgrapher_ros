@@ -34,6 +34,7 @@ set(PACKAGE_DEPENDENCIES
   tf2_ros
   urdf
   visualization_msgs
+  dynamic_reconfigure
 )
 
 if(WIN32)
@@ -69,6 +70,10 @@ endif()
 
 include_directories(
   ${urdfdom_headers_INCLUDE_DIRS}
+)
+
+generate_dynamic_reconfigure_options(
+  configuration_files/dynamic_parameters.cfg
 )
 
 # Override Catkin's GTest configuration to use GMock.
@@ -182,6 +187,9 @@ install(TARGETS ${PROJECT_NAME}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
 )
+
+# make sure configure headers are built before any node using them for dynamic reconfigure
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
 # Install source headers.
 file(GLOB_RECURSE HDRS "cartographer_ros/*.h")
