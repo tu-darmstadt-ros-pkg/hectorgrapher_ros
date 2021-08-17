@@ -155,8 +155,8 @@ class Node {
       cartographer_ros_msgs::ReadMetrics::Request& request,
       cartographer_ros_msgs::ReadMetrics::Response& response);
   bool HandleWriteTsdfMesh(
-      cartographer_ros_msgs::WriteTsdfMesh::Request& request,
-      cartographer_ros_msgs::WriteTsdfMesh::Response& response);
+      cartographer_ros_msgs::WriteTsdfMesh::Request &request,
+      cartographer_ros_msgs::WriteTsdfMesh::Response &response);
   bool HandleEnableMapUpdateState(std_srvs::SetBool::Request& request,
                                   std_srvs::SetBool::Response& response);
 

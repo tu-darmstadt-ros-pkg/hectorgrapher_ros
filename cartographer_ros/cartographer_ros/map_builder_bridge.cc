@@ -695,11 +695,13 @@ int MapBuilderBridge::ProcessCube(Cube &cube,
 
 }
 
-void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh, float cut_off_distance, float cut_off_height) {
+void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
+                                       float cut_off_distance,
+                                       float cut_off_height) {
   ::cartographer::mapping::MapById<
-  ::cartographer::mapping::SubmapId,
-  ::cartographer::mapping::PoseGraphInterface::SubmapData>
-  data = map_builder_->pose_graph()->GetAllSubmapData();
+      ::cartographer::mapping::SubmapId,
+      ::cartographer::mapping::PoseGraphInterface::SubmapData>
+      data = map_builder_->pose_graph()->GetAllSubmapData();
 
   if (!data.empty()) {
     const auto submap3d =
@@ -717,12 +719,12 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh, float cut_off_dis
     size_t count = 0;
 
     for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf);
-    !it.Done(); it.Next()) {
+         !it.Done(); it.Next()) {
       const ::cartographer::mapping::TSDFVoxel voxel = it.GetValue();
       const float tsd = tsdf->ValueConverter().ValueToTSD(voxel.discrete_tsd);
       const Eigen::Vector3f cell_center_submap = tsdf->GetCenterOfCell(it.GetCellIndex());
       const Eigen::Vector3f
-      cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
+          cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
 
       if (voxel.discrete_weight == 0) {
         // Skip inner-object voxels
@@ -730,13 +732,13 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh, float cut_off_dis
       }
 
       if (cut_off_distance >= 0.0f &&
-      (robot_position.cast<float>() - cell_center_global).norm() > cut_off_distance) {
+          (robot_position.cast<float>() - cell_center_global).norm() > cut_off_distance) {
         // Cut-off cells that are too far away from the robot, if parameter valid (>0)
         continue;
       }
 
       if (cut_off_height >= 0.0f &&
-      cell_center_global.z() - static_cast<float>(robot_position.z()) > cut_off_height) {
+          cell_center_global.z() - static_cast<float>(robot_position.z()) > cut_off_height) {
         // Cut-off cells that are too high above the robot, if parameter valid (>0)
         continue;
       }
@@ -762,15 +764,15 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh, float cut_off_dis
 
     }
     LOG(INFO) << "A total of " << count << " triangles are processed. Points in Cloud: "
-    << cloud.size();
+              << cloud.size();
 
     pcl::toPCLPointCloud2(cloud, mesh.cloud);
 
     for (size_t i = 0; i < count; i++) {
       pcl::Vertices v;
       v.vertices.push_back(i * 3 + 0);
-      v.vertices.push_back(i * 3 + 1);
       v.vertices.push_back(i * 3 + 2);
+      v.vertices.push_back(i * 3 + 1);
       mesh.polygons.push_back(v);
     }
   }
@@ -779,7 +781,9 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh, float cut_off_dis
 visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
   visualization_msgs::Marker marker;
   pcl::PolygonMesh mesh;
-  ProcessTSDFMesh(mesh, static_cast<float>(cartographer_ros::kTsdfMeshCutOffDistance), static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight));
+  ProcessTSDFMesh(mesh,
+                  static_cast<float>(cartographer_ros::kTsdfMeshCutOffDistance),
+                  static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight));
 
   std_msgs::ColorRGBA color;
   marker.header.frame_id = "world_cartographer";
@@ -835,28 +839,65 @@ bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename) {
   pcl::PointCloud<pcl::PointXYZ> cloud;
   pcl::fromPCLPointCloud2(mesh.cloud, cloud);
 
-  std::ofstream myfile (filename +".ply");
-  myfile << "ply\n";
-  myfile << "format ascii 1.0\n";
-  myfile << "comment Created by Cartographer \n";
-  myfile << "element vertex " << cloud.size() <<"\n";
-  myfile << "property float x \n";
-  myfile << "property float y \n";
-  myfile << "property float z \n";
-  myfile << "element face " << mesh.polygons.size() <<"\n";
-  myfile << "property list uchar uint vertex_indices \n";
-  myfile << "end_header \n";
-  for(auto & p : cloud.points) {
-    myfile << p.x << " " << p.y << " " << p.z << "\n";
-  }
-  for (auto &vertice_group : mesh.polygons) {
-    myfile << 3 << " " <<  vertice_group.vertices[0] << " " << vertice_group.vertices[1] << " " << vertice_group.vertices[2] << "\n";
-  }
-//  for(auto & t : mesh.polygons) {
-//    myfile << 3 << " " <<  t[0] << " " << t[1] << " " << t[2] << "\n";
+//  std::ofstream myfile(filename + ".ply", std::ofstream::out | std::ofstream::binary);
+//  myfile << "ply\n";
+//  myfile << "format ascii 1.0\n";
+//  myfile << "comment Created by Cartographer \n";
+//  myfile << "element vertex " << cloud.size() << "\n";
+//  myfile << "property float x \n";
+//  myfile << "property float y \n";
+//  myfile << "property float z \n";
+//  myfile << "element face " << mesh.polygons.size() << "\n";
+//  myfile << "property list uchar uint vertex_indices \n";
+//  myfile << "end_header \n";
+//  for (auto &p : cloud.points) {
+//    myfile << p.x << " " << p.y << " " << p.z << "\n";
 //  }
-  myfile.close();
-  LOG(INFO)<<"wrote file";
+//  for (auto &vertice_group : mesh.polygons) {
+//    myfile << 3 << " " << vertice_group.vertices[0] << " " << vertice_group.vertices[1] << " "
+//           << vertice_group.vertices[2] << "\n";
+//  }
+//  myfile.close();
+//  LOG(INFO) << "wrote file";
+  std::ofstream file(filename + ".ply", std::ofstream::binary);
+  if (file.is_open()) {
+    std::size_t cloud_size, polygon_size;
+    cloud_size = cloud.size();
+    polygon_size = mesh.polygons.size();
+    file.write("ply\n", 4*sizeof(char));
+    file.write("format binary_little_endian 1.0\n", 32*sizeof(char));
+    file.write("comment Created by Cartographer\n", 32*sizeof(char));
+    file.write("element vertex ", 16*sizeof(char));
+    file.write(reinterpret_cast<const char*>(&cloud_size), 1*sizeof(std::size_t));
+    file.write("\n", 1*sizeof(char));
+    file.write("property float x\n", 17*sizeof(char));
+    file.write("property float y\n", 17*sizeof(char));
+    file.write("property float z\n", 17*sizeof(char));
+    file.write("element face ", 13*sizeof(char));
+    file.write(reinterpret_cast<const char*>(&polygon_size), 1*sizeof(std::size_t));
+    file.write("\n", 1*sizeof(char));
+    file.write("property list uchar uint vertex_indices\n", 40*sizeof(char));
+    file.write("end_header\n", 11*sizeof(char));
+    for (auto &p : cloud.points) {
+      file.write(reinterpret_cast<const char*>(&(p.x)), 1*sizeof(float));
+      file.write(" ", 1*sizeof(char));
+      file.write(reinterpret_cast<const char*>(&(p.y)), 1*sizeof(float));
+      file.write(" ", 1*sizeof(char));
+      file.write(reinterpret_cast<const char*>(&(p.z)), 1*sizeof(float));
+      file.write("\n", 1*sizeof(char));
+    }
+    for (auto &vertice_group : mesh.polygons) {
+      file.write("3", 1*sizeof(char));
+      file.write(reinterpret_cast<const char*>(&(vertice_group.vertices[0])), 1*sizeof(uint32_t));
+      file.write(" ", 1*sizeof(char));
+      file.write(reinterpret_cast<const char*>(&(vertice_group.vertices[1])), 1*sizeof(uint32_t));
+      file.write(" ", 1*sizeof(char));
+      file.write(reinterpret_cast<const char*>(&(vertice_group.vertices[2])), 1*sizeof(uint32_t));
+      file.write("\n", 1*sizeof(char));
+    }
+  }
+  file.close();
+  LOG(INFO) << "wrote file";
 
   return true;
 }

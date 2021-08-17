@@ -830,8 +830,8 @@ bool Node::HandleReadMetrics(
 }
 
 bool Node::HandleWriteTsdfMesh(
-    ::cartographer_ros_msgs::WriteTsdfMesh::Request & request,
-    ::cartographer_ros_msgs::WriteTsdfMesh::Response& response) {
+    ::cartographer_ros_msgs::WriteTsdfMesh::Request &request,
+    ::cartographer_ros_msgs::WriteTsdfMesh::Response &response) {
   absl::MutexLock lock(&mutex_);
   if (map_builder_bridge_.WriteTSDFMesh(request.filename)) {
     response.status.code = cartographer_ros_msgs::StatusCode::OK;
