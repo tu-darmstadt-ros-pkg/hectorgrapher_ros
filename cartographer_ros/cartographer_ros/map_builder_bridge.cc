@@ -840,26 +840,6 @@ bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename) {
   pcl::PointCloud<pcl::PointXYZ> cloud;
   pcl::fromPCLPointCloud2(mesh.cloud, cloud);
 
-//  std::ofstream myfile(filename + ".ply", std::ofstream::out);
-//  myfile << "ply\n";
-//  myfile << "format ascii 1.0\n";
-//  myfile << "comment Created by Cartographer \n";
-//  myfile << "element vertex " << cloud.size() << "\n";
-//  myfile << "property float x \n";
-//  myfile << "property float y \n";
-//  myfile << "property float z \n";
-//  myfile << "element face " << mesh.polygons.size() << "\n";
-//  myfile << "property list uchar uint vertex_indices \n";
-//  myfile << "end_header \n";
-//  for (auto &p : cloud.points) {
-//    myfile << p.x << " " << p.y << " " << p.z << "\n";
-//  }
-//  for (auto &vertice_group : mesh.polygons) {
-//    myfile << 3 << " " << vertice_group.vertices[0] << " " << vertice_group.vertices[1] << " "
-//           << vertice_group.vertices[2] << "\n";
-//  }
-//  myfile.close();
-//  LOG(INFO) << "wrote file";
   std::ofstream file;
   file.open(filename + ".ply", std::ofstream::out | std::ofstream::binary);
 
