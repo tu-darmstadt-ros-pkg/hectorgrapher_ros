@@ -19,6 +19,7 @@
 #include <pcl/PolygonMesh.h>
 #include <pcl/conversions.h>
 #include <pcl/point_types.h>
+#include <boost/filesystem.hpp>
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
@@ -839,7 +840,7 @@ bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename) {
   pcl::PointCloud<pcl::PointXYZ> cloud;
   pcl::fromPCLPointCloud2(mesh.cloud, cloud);
 
-//  std::ofstream myfile(filename + ".ply", std::ofstream::out | std::ofstream::binary);
+//  std::ofstream myfile(filename + ".ply", std::ofstream::out);
 //  myfile << "ply\n";
 //  myfile << "format ascii 1.0\n";
 //  myfile << "comment Created by Cartographer \n";
@@ -859,47 +860,67 @@ bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename) {
 //  }
 //  myfile.close();
 //  LOG(INFO) << "wrote file";
-  std::ofstream file(filename + ".ply", std::ofstream::binary);
+  std::ofstream file;
+  file.open(filename + ".ply", std::ofstream::out | std::ofstream::binary);
+
   if (file.is_open()) {
     std::size_t cloud_size, polygon_size;
+    const unsigned char count = 3;
+    Eigen::Vector3f u, v, normal;
+    u_char r, g, b;
     cloud_size = cloud.size();
     polygon_size = mesh.polygons.size();
-    file.write("ply\n", 4*sizeof(char));
-    file.write("format binary_little_endian 1.0\n", 32*sizeof(char));
-    file.write("comment Created by Cartographer\n", 32*sizeof(char));
-    file.write("element vertex ", 16*sizeof(char));
-    file.write(reinterpret_cast<const char*>(&cloud_size), 1*sizeof(std::size_t));
-    file.write("\n", 1*sizeof(char));
-    file.write("property float x\n", 17*sizeof(char));
-    file.write("property float y\n", 17*sizeof(char));
-    file.write("property float z\n", 17*sizeof(char));
-    file.write("element face ", 13*sizeof(char));
-    file.write(reinterpret_cast<const char*>(&polygon_size), 1*sizeof(std::size_t));
-    file.write("\n", 1*sizeof(char));
-    file.write("property list uchar uint vertex_indices\n", 40*sizeof(char));
-    file.write("end_header\n", 11*sizeof(char));
+
+    file << "ply\n";
+    file << "format binary_little_endian 1.0\n";
+    file << "comment Created by Cartographer\n";
+    file << "element vertex " << cloud_size << std::endl;
+    file << "property float x\n";
+    file << "property float y\n";
+    file << "property float z\n";
+    file << "element face " << polygon_size << std::endl;
+    file << "property list uchar uint vertex_indices\n";
+    file << "property uchar red\n";
+    file << "property uchar green\n";
+    file << "property uchar blue\n";
+    file << "end_header\n";
+
     for (auto &p : cloud.points) {
-      file.write(reinterpret_cast<const char*>(&(p.x)), 1*sizeof(float));
-      file.write(" ", 1*sizeof(char));
-      file.write(reinterpret_cast<const char*>(&(p.y)), 1*sizeof(float));
-      file.write(" ", 1*sizeof(char));
-      file.write(reinterpret_cast<const char*>(&(p.z)), 1*sizeof(float));
-      file.write("\n", 1*sizeof(char));
+      file.write(reinterpret_cast<const char *>(&(p.x)), sizeof(float));
+      file.write(reinterpret_cast<const char *>(&(p.y)), sizeof(float));
+      file.write(reinterpret_cast<const char *>(&(p.z)), sizeof(float));
     }
     for (auto &vertice_group : mesh.polygons) {
-      file.write("3", 1*sizeof(char));
-      file.write(reinterpret_cast<const char*>(&(vertice_group.vertices[0])), 1*sizeof(uint32_t));
-      file.write(" ", 1*sizeof(char));
-      file.write(reinterpret_cast<const char*>(&(vertice_group.vertices[1])), 1*sizeof(uint32_t));
-      file.write(" ", 1*sizeof(char));
-      file.write(reinterpret_cast<const char*>(&(vertice_group.vertices[2])), 1*sizeof(uint32_t));
-      file.write("\n", 1*sizeof(char));
+      // Write the number of elements
+      file.write(reinterpret_cast<const char *>(&count), sizeof(unsigned char));
+      file.write(reinterpret_cast<const char *>(&(vertice_group.vertices[0])), sizeof(uint32_t));
+      file.write(reinterpret_cast<const char *>(&(vertice_group.vertices[1])), sizeof(uint32_t));
+      file.write(reinterpret_cast<const char *>(&(vertice_group.vertices[2])), sizeof(uint32_t));
+      // Write the colors
+      u = {cloud[vertice_group.vertices[1]].x - cloud[vertice_group.vertices[0]].x,
+           cloud[vertice_group.vertices[1]].y - cloud[vertice_group.vertices[0]].y,
+           cloud[vertice_group.vertices[1]].z - cloud[vertice_group.vertices[0]].z};
+      v = {cloud[vertice_group.vertices[2]].x - cloud[vertice_group.vertices[0]].x,
+           cloud[vertice_group.vertices[2]].y - cloud[vertice_group.vertices[0]].y,
+           cloud[vertice_group.vertices[2]].z - cloud[vertice_group.vertices[0]].z};
+      normal = u.cross(v).normalized();
+      r = static_cast<u_char>((normal.x() + 1.0f) * 0.5f * 255);
+      g = static_cast<u_char>((normal.y() + 1.0f) * 0.5f * 255);
+      b = static_cast<u_char>((normal.z() + 1.0f) * 0.5f * 255);
+      file.write(reinterpret_cast<const char *>(&r), 1 * sizeof(u_char));
+      file.write(reinterpret_cast<const char *>(&g), 1 * sizeof(u_char));
+      file.write(reinterpret_cast<const char *>(&b), 1 * sizeof(u_char));
     }
+
+    file.close();
+    LOG(INFO) << "Exported TSDF Mesh as PLY to " << boost::filesystem::complete(filename + ".ply").string();
+
+    return true;
   }
   file.close();
-  LOG(INFO) << "wrote file";
+  LOG(ERROR) << "Cannot write file to " << boost::filesystem::complete(filename + ".ply").string();
 
-  return true;
+  return false;
 }
 
 sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
