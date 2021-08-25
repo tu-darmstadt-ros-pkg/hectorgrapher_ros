@@ -19,6 +19,7 @@
 #include <pcl/PolygonMesh.h>
 #include <pcl/conversions.h>
 #include <pcl/point_types.h>
+#include <boost/filesystem.hpp>
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
@@ -695,12 +696,13 @@ int MapBuilderBridge::ProcessCube(Cube &cube,
 
 }
 
-visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
+void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
+                                       float cut_off_distance,
+                                       float cut_off_height) {
   ::cartographer::mapping::MapById<
       ::cartographer::mapping::SubmapId,
       ::cartographer::mapping::PoseGraphInterface::SubmapData>
       data = map_builder_->pose_graph()->GetAllSubmapData();
-  visualization_msgs::Marker marker;
 
   if (!data.empty()) {
     const auto submap3d =
@@ -730,15 +732,15 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
         continue;
       }
 
-      if ((robot_position.cast<float>() - cell_center_global).norm()
-          > static_cast<float>(cartographer_ros::kTsdfMeshCutOffDistance)) {
-        // Cut-off cells that are too far away from the robot
+      if (cut_off_distance >= 0.0f &&
+          (robot_position.cast<float>() - cell_center_global).norm() > cut_off_distance) {
+        // Cut-off cells that are too far away from the robot, if parameter valid (>0)
         continue;
       }
 
-      if (cell_center_global.z() - static_cast<float>(robot_position.z())
-          > static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight)) {
-        // Cut-off cells that are too high above the robot
+      if (cut_off_height >= 0.0f &&
+          cell_center_global.z() - static_cast<float>(robot_position.z()) > cut_off_height) {
+        // Cut-off cells that are too high above the robot, if parameter valid (>0)
         continue;
       }
 
@@ -765,60 +767,140 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
     LOG(INFO) << "A total of " << count << " triangles are processed. Points in Cloud: "
               << cloud.size();
 
-    pcl::PolygonMesh mesh;
     pcl::toPCLPointCloud2(cloud, mesh.cloud);
 
     for (size_t i = 0; i < count; i++) {
       pcl::Vertices v;
       v.vertices.push_back(i * 3 + 0);
-      v.vertices.push_back(i * 3 + 1);
       v.vertices.push_back(i * 3 + 2);
+      v.vertices.push_back(i * 3 + 1);
       mesh.polygons.push_back(v);
     }
+  }
+}
 
-    std_msgs::ColorRGBA color;
-    marker.header.frame_id = "world_cartographer";
-    marker.header.stamp = ::ros::Time::now();
-    marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.scale.x = 1.0;
-    marker.scale.y = 1.0;
-    marker.scale.z = 1.0;
-    marker.pose.position.x = 0.0;
-    marker.pose.position.y = 0.0;
-    marker.pose.position.z = 0.0;
-    marker.pose.orientation.x = 0.0;
-    marker.pose.orientation.y = 0.0;
-    marker.pose.orientation.z = 0.0;
-    marker.pose.orientation.w = 1.0;
+visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
+  visualization_msgs::Marker marker;
+  pcl::PolygonMesh mesh;
+  ProcessTSDFMesh(mesh,
+                  static_cast<float>(cartographer_ros::kTsdfMeshCutOffDistance),
+                  static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight));
 
-    for (auto &vertice_group : mesh.polygons) {
-      for (auto &vertice : vertice_group.vertices) {
-        geometry_msgs::Point temp_point;
-        temp_point.x = cloud[vertice].x;
-        temp_point.y = cloud[vertice].y;
-        temp_point.z = cloud[vertice].z;
-        marker.points.push_back(temp_point);
-      }
-      Eigen::Vector3f u = {cloud[vertice_group.vertices[1]].x - cloud[vertice_group.vertices[0]].x,
-                           cloud[vertice_group.vertices[1]].y - cloud[vertice_group.vertices[0]].y,
-                           cloud[vertice_group.vertices[1]].z - cloud[vertice_group.vertices[0]].z};
-      Eigen::Vector3f v = {cloud[vertice_group.vertices[2]].x - cloud[vertice_group.vertices[0]].x,
-                           cloud[vertice_group.vertices[2]].y - cloud[vertice_group.vertices[0]].y,
-                           cloud[vertice_group.vertices[2]].z - cloud[vertice_group.vertices[0]].z};
-      Eigen::Vector3f normal = u.cross(v).normalized();
-      std_msgs::ColorRGBA surface_color;
-      surface_color.r = (normal.x() + 1.0f) * 0.5f;
-      surface_color.g = (normal.y() + 1.0f) * 0.5f;
-      surface_color.b = (normal.z() + 1.0f) * 0.5f;
-      surface_color.a = 1;
-      marker.colors.push_back(surface_color);
-      marker.colors.push_back(surface_color);
-      marker.colors.push_back(surface_color);
+  std_msgs::ColorRGBA color;
+  marker.header.frame_id = "world_cartographer";
+  marker.header.stamp = ::ros::Time::now();
+  marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.scale.x = 1.0;
+  marker.scale.y = 1.0;
+  marker.scale.z = 1.0;
+  marker.pose.position.x = 0.0;
+  marker.pose.position.y = 0.0;
+  marker.pose.position.z = 0.0;
+  marker.pose.orientation.x = 0.0;
+  marker.pose.orientation.y = 0.0;
+  marker.pose.orientation.z = 0.0;
+  marker.pose.orientation.w = 1.0;
+
+  pcl::PointCloud<pcl::PointXYZ> cloud;
+  pcl::fromPCLPointCloud2(mesh.cloud, cloud);
+
+  for (auto &vertice_group : mesh.polygons) {
+    for (auto &vertice : vertice_group.vertices) {
+      geometry_msgs::Point temp_point;
+      temp_point.x = cloud[vertice].x;
+      temp_point.y = cloud[vertice].y;
+      temp_point.z = cloud[vertice].z;
+      marker.points.push_back(temp_point);
     }
+    Eigen::Vector3f u = {cloud[vertice_group.vertices[1]].x - cloud[vertice_group.vertices[0]].x,
+                         cloud[vertice_group.vertices[1]].y - cloud[vertice_group.vertices[0]].y,
+                         cloud[vertice_group.vertices[1]].z - cloud[vertice_group.vertices[0]].z};
+    Eigen::Vector3f v = {cloud[vertice_group.vertices[2]].x - cloud[vertice_group.vertices[0]].x,
+                         cloud[vertice_group.vertices[2]].y - cloud[vertice_group.vertices[0]].y,
+                         cloud[vertice_group.vertices[2]].z - cloud[vertice_group.vertices[0]].z};
+    Eigen::Vector3f normal = u.cross(v).normalized();
+    std_msgs::ColorRGBA surface_color;
+    surface_color.r = (normal.x() + 1.0f) * 0.5f;
+    surface_color.g = (normal.y() + 1.0f) * 0.5f;
+    surface_color.b = (normal.z() + 1.0f) * 0.5f;
+    surface_color.a = 1;
+    marker.colors.push_back(surface_color);
+    marker.colors.push_back(surface_color);
+    marker.colors.push_back(surface_color);
   }
 
   return marker;
+}
+
+bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename) {
+  pcl::PolygonMesh mesh;
+  ProcessTSDFMesh(mesh, -1.0f, -1.0f);
+
+  pcl::PointCloud<pcl::PointXYZ> cloud;
+  pcl::fromPCLPointCloud2(mesh.cloud, cloud);
+
+  std::ofstream file;
+  file.open(filename + ".ply", std::ofstream::out | std::ofstream::binary);
+
+  if (file.is_open()) {
+    std::size_t cloud_size, polygon_size;
+    const unsigned char count = 3;
+    Eigen::Vector3f u, v, normal;
+    u_char r, g, b;
+    cloud_size = cloud.size();
+    polygon_size = mesh.polygons.size();
+
+    file << "ply\n";
+    file << "format binary_little_endian 1.0\n";
+    file << "comment Created by Cartographer\n";
+    file << "element vertex " << cloud_size << std::endl;
+    file << "property float x\n";
+    file << "property float y\n";
+    file << "property float z\n";
+    file << "element face " << polygon_size << std::endl;
+    file << "property list uchar uint vertex_indices\n";
+    file << "property uchar red\n";
+    file << "property uchar green\n";
+    file << "property uchar blue\n";
+    file << "end_header\n";
+
+    for (auto &p : cloud.points) {
+      file.write(reinterpret_cast<const char *>(&(p.x)), sizeof(float));
+      file.write(reinterpret_cast<const char *>(&(p.y)), sizeof(float));
+      file.write(reinterpret_cast<const char *>(&(p.z)), sizeof(float));
+    }
+    for (auto &vertice_group : mesh.polygons) {
+      // Write the number of elements
+      file.write(reinterpret_cast<const char *>(&count), sizeof(unsigned char));
+      file.write(reinterpret_cast<const char *>(&(vertice_group.vertices[0])), sizeof(uint32_t));
+      file.write(reinterpret_cast<const char *>(&(vertice_group.vertices[1])), sizeof(uint32_t));
+      file.write(reinterpret_cast<const char *>(&(vertice_group.vertices[2])), sizeof(uint32_t));
+      // Write the colors
+      u = {cloud[vertice_group.vertices[1]].x - cloud[vertice_group.vertices[0]].x,
+           cloud[vertice_group.vertices[1]].y - cloud[vertice_group.vertices[0]].y,
+           cloud[vertice_group.vertices[1]].z - cloud[vertice_group.vertices[0]].z};
+      v = {cloud[vertice_group.vertices[2]].x - cloud[vertice_group.vertices[0]].x,
+           cloud[vertice_group.vertices[2]].y - cloud[vertice_group.vertices[0]].y,
+           cloud[vertice_group.vertices[2]].z - cloud[vertice_group.vertices[0]].z};
+      normal = u.cross(v).normalized();
+      r = static_cast<u_char>((normal.x() + 1.0f) * 0.5f * 255);
+      g = static_cast<u_char>((normal.y() + 1.0f) * 0.5f * 255);
+      b = static_cast<u_char>((normal.z() + 1.0f) * 0.5f * 255);
+      file.write(reinterpret_cast<const char *>(&r), 1 * sizeof(u_char));
+      file.write(reinterpret_cast<const char *>(&g), 1 * sizeof(u_char));
+      file.write(reinterpret_cast<const char *>(&b), 1 * sizeof(u_char));
+    }
+
+    file.close();
+    LOG(INFO) << "Exported TSDF Mesh as PLY to " << boost::filesystem::complete(filename + ".ply").string();
+
+    return true;
+  }
+  file.close();
+  LOG(ERROR) << "Cannot write file to " << boost::filesystem::complete(filename + ".ply").string();
+
+  return false;
 }
 
 sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {

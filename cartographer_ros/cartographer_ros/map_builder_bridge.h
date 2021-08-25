@@ -21,6 +21,9 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <pcl/PolygonMesh.h>
+#include <pcl/conversions.h>
+#include <pcl/point_types.h>
 
 #include "absl/synchronization/mutex.h"
 #include "cartographer/mapping/map_builder_interface.h"
@@ -151,12 +154,31 @@ class MapBuilderBridge {
    */
   int ProcessCube(Cube &cube, pcl::PointCloud<pcl::PointXYZ> &cloud, float isolevel);
   /**
-   * Creates a mesh surface representation of the TSDF map within a certain cut-off-distance from
-   * the robot. Uses a visualization_msgs::Marker Triangle_List as representation in Rviz, where the
-   * colors are chosen according to the surface normals
+   * Giving an address to a pcl::PolygonMesh object, the function creates a mesh surface
+   * representation of the TSDF map within a certain cut-off-distance and cut-off-height from
+   * the robot
+   * @param mesh pcl::PolygonMesh object to store the mesh surface
+   * @param cut_off_distance float as cut-off-distance from the robots current position. Negative
+   * values indicate no cut-off along this dimension
+   * @param cut_off_height float as cut-off-height above the robots current height. Negative values
+   * indicate no cut-off along this dimension
+   */
+  void ProcessTSDFMesh(pcl::PolygonMesh &mesh, float cut_off_distance, float cut_off_height);
+
+  /**
+   * Uses a visualization_msgs::Marker Triangle_List as representation for the surface mesh
+   * retrieved from ProcessTSDFMesh to display in Rviz, where the colors are chosen according to the
+   * surface normals
    * @return visualization_msgs::Marker
    */
   visualization_msgs::Marker GetTSDFMesh();
+
+  /**
+   * Service routine to write the TSDF mesh representation as PLY file
+   * @param filename
+   * @return status of thefile writing
+   */
+  bool WriteTSDFMesh(const std::string &filename);
 
   /**
    * Creates a surface representation of the TSDF map as points within a certain cut-off distance

@@ -43,6 +43,7 @@
 #include "cartographer_ros_msgs/SubmapList.h"
 #include "cartographer_ros_msgs/SubmapQuery.h"
 #include "cartographer_ros_msgs/WriteState.h"
+#include "cartographer_ros_msgs/WriteTsdfMesh.h"
 #include "nav_msgs/Odometry.h"
 #include "ros/ros.h"
 #include "sensor_msgs/Imu.h"
@@ -153,6 +154,9 @@ class Node {
   bool HandleReadMetrics(
       cartographer_ros_msgs::ReadMetrics::Request& request,
       cartographer_ros_msgs::ReadMetrics::Response& response);
+  bool HandleWriteTsdfMesh(
+      cartographer_ros_msgs::WriteTsdfMesh::Request &request,
+      cartographer_ros_msgs::WriteTsdfMesh::Response &response);
   bool HandleEnableMapUpdateState(std_srvs::SetBool::Request& request,
                                   std_srvs::SetBool::Response& response);
 

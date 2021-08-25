@@ -134,6 +134,8 @@ Node::Node(
   service_servers_.push_back(node_handle_.advertiseService(
       kReadMetricsServiceName, &Node::HandleReadMetrics, this));
   service_servers_.push_back(node_handle_.advertiseService(
+      kWriteTsdfMeshServiceName, &Node::HandleWriteTsdfMesh, this));
+  service_servers_.push_back(node_handle_.advertiseService(
       kEnableMapUpdateServiceName, &Node::HandleEnableMapUpdateState, this));
   tsdf_mesh_map_publisher_ = node_handle_.advertise<::visualization_msgs::Marker>(
       kTSDFMeshTopic, kLatestOnlyPublisherQueueSize);
@@ -824,6 +826,22 @@ bool Node::HandleReadMetrics(
   metrics_registry_->ReadMetrics(&response);
   response.status.code = cartographer_ros_msgs::StatusCode::OK;
   response.status.message = "Successfully read metrics.";
+  return true;
+}
+
+bool Node::HandleWriteTsdfMesh(
+    ::cartographer_ros_msgs::WriteTsdfMesh::Request &request,
+    ::cartographer_ros_msgs::WriteTsdfMesh::Response &response) {
+  absl::MutexLock lock(&mutex_);
+  if (map_builder_bridge_.WriteTSDFMesh(request.filename)) {
+    response.status.code = cartographer_ros_msgs::StatusCode::OK;
+    response.status.message =
+        absl::StrCat("State written to '", request.filename, "'.");
+  } else {
+    response.status.code = cartographer_ros_msgs::StatusCode::INVALID_ARGUMENT;
+    response.status.message =
+        absl::StrCat("Failed to write '", request.filename, "'.");
+  }
   return true;
 }
 
