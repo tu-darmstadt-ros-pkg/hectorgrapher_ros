@@ -141,6 +141,8 @@ Node::Node(
       kTSDFMeshTopic, kLatestOnlyPublisherQueueSize);
   tsdf_map_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>(
       kTSDFTopic, kLatestOnlyPublisherQueueSize);
+  tsdf_slice_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>(
+      kTSDFSliceTopic, kLatestOnlyPublisherQueueSize);
   scan_matched_point_cloud_publisher_ =
       node_handle_.advertise<sensor_msgs::PointCloud2>(
           kScanMatchedPointCloudTopic, kLatestOnlyPublisherQueueSize);
@@ -168,6 +170,8 @@ Node::Node(
       ::ros::WallDuration(kTSDFPublishPeriodSec), &Node::PublishTSDFMesh, this));
   wall_timers_.push_back(node_handle_.createWallTimer(
       ::ros::WallDuration(kTSDFPublishPeriodSec), &Node::PublishTSDF, this));
+  wall_timers_.push_back(node_handle_.createWallTimer(
+      ::ros::WallDuration(kTSDFPublishPeriodSec), &Node::PublishTSDFSlice, this));
 }
 
 Node::~Node() { FinishAllTrajectories(); }
@@ -440,6 +444,14 @@ void Node::PublishTSDF(const ::ros::WallTimerEvent& unused_timer_event) {
     absl::MutexLock lock(&mutex_);
     auto msg = map_builder_bridge_.GetTSDF();
     tsdf_map_publisher_.publish(msg);
+  }
+}
+
+void Node::PublishTSDFSlice(const ::ros::WallTimerEvent& unused_timer_event) {
+  if (tsdf_slice_publisher_.getNumSubscribers() > 0) {
+    absl::MutexLock lock(&mutex_);
+    auto msg = map_builder_bridge_.GetTSDFSlice();
+    tsdf_slice_publisher_.publish(msg);
   }
 }
 

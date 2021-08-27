@@ -145,7 +145,7 @@ class MapBuilderBridge {
   /**
    * Performs Marching Cubes on a MapBuilderBridge::Cube element representing a TSDF voxel in space.
    * Every found zero-crossing on an edge is registered in the cloud as a 3D point, but always in
-   * triplets so that points 0-1-2, 3-4-5, etc. form a triangle represrnting the mesh surface.
+   * triplets so that points 0-1-2, 3-4-5, etc. form a triangle representing the mesh surface.
    * Implementation inspired by Isaac Zhang: https://github.com/zhangxiaoxuan1/tsdfprocessor/blob/cdbc42300a9f5a72411b052a04c7972cef30f3f5/marching_cubes.cpp
    * @param cube pointer to an MapBuilderBridge::Cube element representing a TSDF voxel
    * @param cloud pointer to a PCL pointcloud to store the found triangle vertices
@@ -186,6 +186,13 @@ class MapBuilderBridge {
    * @return sensor_msgs::PointCloud2
    */
   sensor_msgs::PointCloud2 GetTSDF();
+
+  /**
+   * Creates a slice of the TSDF map in all 3 dimensions around a position determined by
+   * dynamic_reconfigure parameters
+   * @return sensor_msgs::PointCloud2
+   */
+  sensor_msgs::PointCloud2 GetTSDFSlice();
 
   SensorBridge *sensor_bridge(int trajectory_id);
   std::unique_ptr<cartographer::mapping::MapBuilderInterface> map_builder_;

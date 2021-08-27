@@ -708,9 +708,16 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
     const auto submap3d =
         static_cast<const ::cartographer::mapping::Submap3D *>(
             data.begin()->data.submap.get());
-    const auto tsdf =
-        static_cast<const ::cartographer::mapping::HybridGridTSDF *>(
-            &submap3d->high_resolution_hybrid_grid());
+    const ::cartographer::mapping::HybridGridTSDF *tsdf;
+    if (kTsdfVisualizationHighRes) {
+      tsdf =
+          dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
+              &submap3d->high_resolution_hybrid_grid());
+    } else {
+      tsdf =
+          dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
+              &submap3d->low_resolution_hybrid_grid());
+    }
     pcl::PointCloud<pcl::PointXYZ> cloud;
     auto local_trajectory_data = GetLocalTrajectoryData();
     auto robot_position = local_trajectory_data[0].local_slam_data->local_pose.translation();
@@ -914,9 +921,16 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
     const ::cartographer::mapping::Submap3D *submap3d =
         static_cast<const ::cartographer::mapping::Submap3D *>(
             data.begin()->data.submap.get());
-    const ::cartographer::mapping::HybridGridTSDF *tsdf =
-        static_cast<const ::cartographer::mapping::HybridGridTSDF *>(
-            &submap3d->high_resolution_hybrid_grid());
+    const ::cartographer::mapping::HybridGridTSDF *tsdf;
+    if (kTsdfVisualizationHighRes) {
+      tsdf =
+          dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
+              &submap3d->high_resolution_hybrid_grid());
+    } else {
+      tsdf =
+          dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
+              &submap3d->low_resolution_hybrid_grid());
+    }
     std::vector<Eigen::Array4f> cells;
     auto local_trajectory_data = GetLocalTrajectoryData();
     auto robot_position = local_trajectory_data[0].local_slam_data->local_pose.translation();
@@ -948,6 +962,79 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
       }
 
       if (tsd >= 0 && tsd < resolution) {
+        cells.emplace_back(cell_center_global[0], cell_center_global[1],
+                           cell_center_global[2], tsd);
+      }
+    }
+
+    msg = ToPointCloud2Message(
+        ::cartographer::common::ToUniversal(FromRos(::ros::Time::now())),
+        "world_cartographer", cells);
+  }
+
+  return msg;
+}
+
+sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFSlice() {
+  ::cartographer::mapping::MapById<
+      ::cartographer::mapping::SubmapId,
+      ::cartographer::mapping::PoseGraphInterface::SubmapData>
+      data = map_builder_->pose_graph()->GetAllSubmapData();
+  sensor_msgs::PointCloud2 msg;
+
+  if (!data.empty()) {
+    const ::cartographer::mapping::Submap3D *submap3d =
+        static_cast<const ::cartographer::mapping::Submap3D *>(
+            data.begin()->data.submap.get());
+    const ::cartographer::mapping::HybridGridTSDF *tsdf;
+    if (kTsdfVisualizationHighRes) {
+      tsdf =
+          dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
+              &submap3d->high_resolution_hybrid_grid());
+    } else {
+      tsdf =
+          dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
+              &submap3d->low_resolution_hybrid_grid());
+    }
+
+    std::vector<Eigen::Array4f> cells;
+    auto local_trajectory_data = GetLocalTrajectoryData();
+    auto robot_position = local_trajectory_data[0].local_slam_data->local_pose.translation();
+    float resolution = tsdf->resolution();
+
+    for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf); !it.Done();
+         it.Next()) {
+      const ::cartographer::mapping::TSDFVoxel voxel = it.GetValue();
+      const float tsd = tsdf->ValueConverter().ValueToTSD(voxel.discrete_tsd);
+      const Eigen::Vector3f cell_center_submap = tsdf->GetCenterOfCell(it.GetCellIndex());
+      const Eigen::Vector3f
+          cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
+
+      float slice_center_x, slice_center_y, slice_center_z;
+
+      slice_center_x = kTsdfSliceCenterXOnRobotPosition ? static_cast<float>(robot_position.x())
+                                                        : static_cast<float>(kTsdfSliceCenterX);
+      slice_center_y = kTsdfSliceCenterYOnRobotPosition ? static_cast<float>(robot_position.y())
+                                                        : static_cast<float>(kTsdfSliceCenterY);
+      slice_center_z = kTsdfSliceCenterZOnRobotPosition ? static_cast<float>(robot_position.z())
+                                                        : static_cast<float>(kTsdfSliceCenterZ);
+
+      Eigen::Vector3f slice_center = {slice_center_x, slice_center_y, slice_center_z};
+
+      if (voxel.discrete_weight == 0) {
+        // Skip inner-object voxels
+        continue;
+      }
+
+      if ((slice_center - cell_center_global).norm()
+          > static_cast<float>(cartographer_ros::kTsdfSliceCutOffDistance)) {
+        // Cut-off cells that are too far away from the slice center
+        continue;
+      }
+
+      if (std::abs(cell_center_global.x() - slice_center.x()) < resolution / 2
+          || std::abs(cell_center_global.y() - slice_center.y()) < resolution / 2
+          || std::abs(cell_center_global.z() - slice_center.z()) < resolution / 2) {
         cells.emplace_back(cell_center_global[0], cell_center_global[1],
                            cell_center_global[2], tsd);
       }

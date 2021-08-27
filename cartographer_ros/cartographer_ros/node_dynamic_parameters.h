@@ -11,10 +11,18 @@
 namespace cartographer_ros {
 
 // Declare parameters as extern
+extern bool kTsdfVisualizationHighRes;
 extern double kTsdfMeshCutOffDistance;
 extern double kTsdfMeshCutOffHeight;
 extern double kTsdfCutOffDistance;
 extern double kTsdfCutOffHeight;
+extern double kTsdfSliceCutOffDistance;
+extern double kTsdfSliceCenterX;
+extern bool kTsdfSliceCenterXOnRobotPosition;
+extern double kTsdfSliceCenterY;
+extern bool kTsdfSliceCenterYOnRobotPosition;
+extern double kTsdfSliceCenterZ;
+extern bool kTsdfSliceCenterZOnRobotPosition;
 
 /**
  * Callback function for dynamic reconfigure parameter server
