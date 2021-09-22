@@ -174,9 +174,9 @@ class Node {
   void PublishTrajectoryNodeList(const ::ros::WallTimerEvent& timer_event);
   void PublishLandmarkPosesList(const ::ros::WallTimerEvent& timer_event);
   void PublishConstraintList(const ::ros::WallTimerEvent& timer_event);
-  void PublishTSDFMesh(const ::ros::WallTimerEvent& timer_event);
-  void PublishTSDF(const ::ros::WallTimerEvent& timer_event);
-  void PublishTSDFSlice(const ::ros::WallTimerEvent& timer_event);
+  void PublishTSDFMeshMarker(const ::ros::WallTimerEvent& timer_event);
+  void PublishTSDFPointsMarker(const ::ros::WallTimerEvent& timer_event);
+  void PublishTSDFSliceMarker(const ::ros::WallTimerEvent& timer_event);
   bool ValidateTrajectoryOptions(const TrajectoryOptions& options);
   bool ValidateTopicNames(const TrajectoryOptions& options);
   cartographer_ros_msgs::StatusResponse FinishTrajectoryUnderLock(

@@ -167,11 +167,11 @@ Node::Node(
       ::ros::WallDuration(kConstraintPublishPeriodSec),
       &Node::PublishConstraintList, this));
   wall_timers_.push_back(node_handle_.createWallTimer(
-      ::ros::WallDuration(kTSDFPublishPeriodSec), &Node::PublishTSDFMesh, this));
+      ::ros::WallDuration(kTSDFPublishPeriodSec), &Node::PublishTSDFMeshMarker, this));
   wall_timers_.push_back(node_handle_.createWallTimer(
-      ::ros::WallDuration(kTSDFPublishPeriodSec), &Node::PublishTSDF, this));
+      ::ros::WallDuration(kTSDFPublishPeriodSec), &Node::PublishTSDFPointsMarker, this));
   wall_timers_.push_back(node_handle_.createWallTimer(
-      ::ros::WallDuration(kTSDFPublishPeriodSec), &Node::PublishTSDFSlice, this));
+      ::ros::WallDuration(kTSDFPublishPeriodSec), &Node::PublishTSDFSliceMarker, this));
 }
 
 Node::~Node() { FinishAllTrajectories(); }
@@ -431,7 +431,7 @@ void Node::PublishConstraintList(
   }
 }
 
-void Node::PublishTSDFMesh(const ::ros::WallTimerEvent& unused_timer_event) {
+void Node::PublishTSDFMeshMarker(const ::ros::WallTimerEvent& unused_timer_event) {
   if (tsdf_mesh_marker_publisher_.getNumSubscribers() > 0) {
     absl::MutexLock lock(&mutex_);
     auto msg = map_builder_bridge_.GetTSDFMeshMarker();
@@ -439,7 +439,7 @@ void Node::PublishTSDFMesh(const ::ros::WallTimerEvent& unused_timer_event) {
   }
 }
 
-void Node::PublishTSDF(const ::ros::WallTimerEvent& unused_timer_event) {
+void Node::PublishTSDFPointsMarker(const ::ros::WallTimerEvent& unused_timer_event) {
   if (tsdf_points_marker_publisher_.getNumSubscribers() > 0) {
     absl::MutexLock lock(&mutex_);
     auto msg = map_builder_bridge_.GetTSDFPointsMarker();
@@ -447,7 +447,7 @@ void Node::PublishTSDF(const ::ros::WallTimerEvent& unused_timer_event) {
   }
 }
 
-void Node::PublishTSDFSlice(const ::ros::WallTimerEvent& unused_timer_event) {
+void Node::PublishTSDFSliceMarker(const ::ros::WallTimerEvent& unused_timer_event) {
   if (tsdf_slice_marker_publisher_.getNumSubscribers() > 0) {
     absl::MutexLock lock(&mutex_);
     auto msg = map_builder_bridge_.GetTSDFSliceMarker();
