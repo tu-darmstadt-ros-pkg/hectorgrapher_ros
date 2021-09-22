@@ -10,8 +10,8 @@ namespace cartographer_ros {
 bool kTsdfVisualizationHighRes;
 double kTsdfMeshCutOffDistance;
 double kTsdfMeshCutOffHeight;
-double kTsdfCutOffDistance;
-double kTsdfCutOffHeight;
+double kTsdfPointsCutOffDistance;
+double kTsdfPointsCutOffHeight;
 double kTsdfSliceCutOffDistance;
 double kTsdfSliceCenterX;
 bool kTsdfSliceCenterXOnRobotPosition;
@@ -24,8 +24,8 @@ void dynamic_reconfigure_callback(cartographer_ros::dynamic_parametersConfig &co
   kTsdfVisualizationHighRes = config.tsdf_visualization_high_res;
   kTsdfMeshCutOffDistance = config.tsdf_mesh_cut_off_distance;
   kTsdfMeshCutOffHeight = config.tsdf_mesh_cut_off_height;
-  kTsdfCutOffDistance = config.tsdf_cut_off_distance;
-  kTsdfCutOffHeight = config.tsdf_cut_off_height;
+  kTsdfPointsCutOffDistance = config.tsdf_points_cut_off_distance;
+  kTsdfPointsCutOffHeight = config.tsdf_points_cut_off_height;
   kTsdfSliceCutOffDistance = config.tsdf_slice_cut_off_distance;
   kTsdfSliceCenterX = config.tsdf_slice_center_x;
   kTsdfSliceCenterXOnRobotPosition = config.tsdf_slice_center_x_on_robot_position;
@@ -37,8 +37,8 @@ void dynamic_reconfigure_callback(cartographer_ros::dynamic_parametersConfig &co
   ROS_INFO("Reconfigure Request: tsdf_visualization_high_res: %s, "
            "tsdf_mesh_cut_off_distance: %f, "
            "tsdf_mesh_cut_off_height: %f, "
-           "tsdf_cut_off_distance: %f, "
-           "tsdf_cut_off_height: %f, "
+           "tsdf_points_cut_off_distance: %f, "
+           "tsdf_points_cut_off_height: %f, "
            "tsdf_slice_cut_off_height: %f, "
            "tsdf_slice_center_x: %f, "
            "tsdf_slice_center_x_on_robot_position: %s, "
@@ -49,8 +49,8 @@ void dynamic_reconfigure_callback(cartographer_ros::dynamic_parametersConfig &co
            config.tsdf_visualization_high_res ? "True" : "False",
            config.tsdf_mesh_cut_off_distance,
            config.tsdf_mesh_cut_off_height,
-           config.tsdf_cut_off_distance,
-           config.tsdf_cut_off_height,
+           config.tsdf_points_cut_off_distance,
+           config.tsdf_points_cut_off_height,
            config.tsdf_slice_cut_off_distance,
            config.tsdf_slice_center_x,
            config.tsdf_slice_center_x_on_robot_position ? "True" : "False",

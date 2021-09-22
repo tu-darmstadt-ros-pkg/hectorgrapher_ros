@@ -137,12 +137,12 @@ Node::Node(
       kWriteTsdfMeshServiceName, &Node::HandleWriteTsdfMesh, this));
   service_servers_.push_back(node_handle_.advertiseService(
       kEnableMapUpdateServiceName, &Node::HandleEnableMapUpdateState, this));
-  tsdf_mesh_map_publisher_ = node_handle_.advertise<::visualization_msgs::Marker>(
-      kTSDFMeshTopic, kLatestOnlyPublisherQueueSize);
-  tsdf_map_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>(
-      kTSDFTopic, kLatestOnlyPublisherQueueSize);
-  tsdf_slice_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>(
-      kTSDFSliceTopic, kLatestOnlyPublisherQueueSize);
+  tsdf_mesh_marker_publisher_ = node_handle_.advertise<::visualization_msgs::Marker>(
+      kTSDFMeshMarkerTopic, kLatestOnlyPublisherQueueSize);
+  tsdf_points_marker_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>(
+      kTSDFPointsMarkerTopic, kLatestOnlyPublisherQueueSize);
+  tsdf_slice_marker_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>(
+      kTSDFSliceMarkerTopic, kLatestOnlyPublisherQueueSize);
   scan_matched_point_cloud_publisher_ =
       node_handle_.advertise<sensor_msgs::PointCloud2>(
           kScanMatchedPointCloudTopic, kLatestOnlyPublisherQueueSize);
@@ -432,26 +432,26 @@ void Node::PublishConstraintList(
 }
 
 void Node::PublishTSDFMesh(const ::ros::WallTimerEvent& unused_timer_event) {
-  if (tsdf_mesh_map_publisher_.getNumSubscribers() > 0) {
+  if (tsdf_mesh_marker_publisher_.getNumSubscribers() > 0) {
     absl::MutexLock lock(&mutex_);
-    auto msg = map_builder_bridge_.GetTSDFMesh();
-    tsdf_mesh_map_publisher_.publish(msg);
+    auto msg = map_builder_bridge_.GetTSDFMeshMarker();
+    tsdf_mesh_marker_publisher_.publish(msg);
   }
 }
 
 void Node::PublishTSDF(const ::ros::WallTimerEvent& unused_timer_event) {
-  if (tsdf_map_publisher_.getNumSubscribers() > 0) {
+  if (tsdf_points_marker_publisher_.getNumSubscribers() > 0) {
     absl::MutexLock lock(&mutex_);
-    auto msg = map_builder_bridge_.GetTSDF();
-    tsdf_map_publisher_.publish(msg);
+    auto msg = map_builder_bridge_.GetTSDFPointsMarker();
+    tsdf_points_marker_publisher_.publish(msg);
   }
 }
 
 void Node::PublishTSDFSlice(const ::ros::WallTimerEvent& unused_timer_event) {
-  if (tsdf_slice_publisher_.getNumSubscribers() > 0) {
+  if (tsdf_slice_marker_publisher_.getNumSubscribers() > 0) {
     absl::MutexLock lock(&mutex_);
-    auto msg = map_builder_bridge_.GetTSDFSlice();
-    tsdf_slice_publisher_.publish(msg);
+    auto msg = map_builder_bridge_.GetTSDFSliceMarker();
+    tsdf_slice_marker_publisher_.publish(msg);
   }
 }
 

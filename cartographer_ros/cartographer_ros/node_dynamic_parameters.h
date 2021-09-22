@@ -14,8 +14,8 @@ namespace cartographer_ros {
 extern bool kTsdfVisualizationHighRes;
 extern double kTsdfMeshCutOffDistance;
 extern double kTsdfMeshCutOffHeight;
-extern double kTsdfCutOffDistance;
-extern double kTsdfCutOffHeight;
+extern double kTsdfPointsCutOffDistance;
+extern double kTsdfPointsCutOffHeight;
 extern double kTsdfSliceCutOffDistance;
 extern double kTsdfSliceCenterX;
 extern bool kTsdfSliceCenterXOnRobotPosition;

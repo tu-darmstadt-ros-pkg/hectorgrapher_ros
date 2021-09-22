@@ -786,7 +786,7 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
   }
 }
 
-visualization_msgs::Marker MapBuilderBridge::GetTSDFMesh() {
+visualization_msgs::Marker MapBuilderBridge::GetTSDFMeshMarker() {
   visualization_msgs::Marker marker;
   pcl::PolygonMesh mesh;
   ProcessTSDFMesh(mesh,
@@ -910,7 +910,7 @@ bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename) {
   return false;
 }
 
-sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
+sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFPointsMarker() {
   ::cartographer::mapping::MapById<
       ::cartographer::mapping::SubmapId,
       ::cartographer::mapping::PoseGraphInterface::SubmapData>
@@ -950,13 +950,13 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
       }
 
       if ((robot_position.cast<float>() - cell_center_global).norm()
-          > static_cast<float>(cartographer_ros::kTsdfCutOffDistance)) {
+          > static_cast<float>(cartographer_ros::kTsdfPointsCutOffDistance)) {
         // Cut-off cells that are too far away from the robot
         continue;
       }
 
       if (cell_center_global.z() - static_cast<float>(robot_position.z())
-          > static_cast<float>(cartographer_ros::kTsdfCutOffHeight)) {
+          > static_cast<float>(cartographer_ros::kTsdfPointsCutOffHeight)) {
         // Cut-off cells that are too high above the robot
         continue;
       }
@@ -975,7 +975,7 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDF() {
   return msg;
 }
 
-sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFSlice() {
+sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFSliceMarker() {
   ::cartographer::mapping::MapById<
       ::cartographer::mapping::SubmapId,
       ::cartographer::mapping::PoseGraphInterface::SubmapData>
@@ -1063,5 +1063,4 @@ void MapBuilderBridge::OnLocalSlamResult(
   absl::MutexLock lock(&mutex_);
   local_slam_data_[trajectory_id] = std::move(local_slam_data);
 }
-
 }  // namespace cartographer_ros

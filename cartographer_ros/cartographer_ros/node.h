@@ -206,9 +206,9 @@ class Node {
   // These ros::ServiceServers need to live for the lifetime of the node.
   std::vector<::ros::ServiceServer> service_servers_;
   ::ros::Publisher scan_matched_point_cloud_publisher_;
-  ::ros::Publisher tsdf_mesh_map_publisher_;
-  ::ros::Publisher tsdf_map_publisher_;
-  ::ros::Publisher tsdf_slice_publisher_;
+  ::ros::Publisher tsdf_mesh_marker_publisher_;
+  ::ros::Publisher tsdf_points_marker_publisher_;
+  ::ros::Publisher tsdf_slice_marker_publisher_;
 
   struct TrajectorySensorSamplers {
     TrajectorySensorSamplers(const double rangefinder_sampling_ratio,
