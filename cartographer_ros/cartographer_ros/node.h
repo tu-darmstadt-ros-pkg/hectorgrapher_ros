@@ -159,6 +159,8 @@ class Node {
       cartographer_ros_msgs::WriteTsdfMesh::Response &response);
   bool HandleEnableMapUpdateState(std_srvs::SetBool::Request& request,
                                   std_srvs::SetBool::Response& response);
+  bool HandleUseScanMatchingState(std_srvs::SetBool::Request& request,
+                                  std_srvs::SetBool::Response& response);
 
   // Returns the set of SensorIds expected for a trajectory.
   // 'SensorId::id' is the expected ROS topic name.

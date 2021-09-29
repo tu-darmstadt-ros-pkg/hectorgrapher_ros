@@ -48,6 +48,8 @@ constexpr char kTrajectoryNodeListTopic[] = "trajectory_node_list";
 constexpr char kLandmarkPosesListTopic[] = "landmark_poses_list";
 constexpr char kConstraintListTopic[] = "constraint_list";
 constexpr char kEnableMapUpdateServiceName[] = "enable_map_update";
+constexpr char kUseScanMatchingServiceName[] = "use_scan_matching";
+
 constexpr double kConstraintPublishPeriodSec = 0.5;
 constexpr double kTSDFPublishPeriodSec = 1.0;
 constexpr double kSubmapAnnouncementPeriodSec = 0.5;

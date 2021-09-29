@@ -137,6 +137,9 @@ Node::Node(
       kWriteTsdfMeshServiceName, &Node::HandleWriteTsdfMesh, this));
   service_servers_.push_back(node_handle_.advertiseService(
       kEnableMapUpdateServiceName, &Node::HandleEnableMapUpdateState, this));
+  service_servers_.push_back(node_handle_.advertiseService(
+      kUseScanMatchingServiceName, &Node::HandleUseScanMatchingState, this));
+
   tsdf_mesh_map_publisher_ = node_handle_.advertise<::visualization_msgs::Marker>(
       kTSDFMeshTopic, kLatestOnlyPublisherQueueSize);
   tsdf_map_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>(
@@ -792,6 +795,14 @@ bool Node::HandleEnableMapUpdateState(std_srvs::SetBool::Request& request,
   absl::MutexLock lock(&mutex_);
   LOG(INFO) << "Setting UpdateMap to " << bool(request.data);
   map_builder_bridge_.map_builder_->SetMapUpdateEnabled(bool(request.data));
+  response.success = true;
+  return true;
+}
+bool Node::HandleUseScanMatchingState(std_srvs::SetBool::Request& request,
+                                      std_srvs::SetBool::Response& response) {
+  absl::MutexLock lock(&mutex_);
+  LOG(INFO) << "Setting UseScanMatching to " << bool(request.data);
+  map_builder_bridge_.map_builder_->UseScanMatching(bool(request.data));
   response.success = true;
   return true;
 }
