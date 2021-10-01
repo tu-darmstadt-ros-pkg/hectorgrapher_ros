@@ -699,81 +699,91 @@ int MapBuilderBridge::ProcessCube(Cube &cube,
 void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
                                        float cut_off_distance,
                                        float cut_off_height) {
-  ::cartographer::mapping::MapById<
-      ::cartographer::mapping::SubmapId,
-      ::cartographer::mapping::PoseGraphInterface::SubmapData>
-      data = map_builder_->pose_graph()->GetAllSubmapData();
+  auto all_submap_data = map_builder_->pose_graph()->GetAllSubmapData();
+//  auto submap_poses_iter = map_builder_->pose_graph()->GetAllSubmapPoses().begin();
+//  auto submap_trajectories = map_builder_->pose_graph()->GetTrajectoryData();
+
+  pcl::PointCloud<pcl::PointXYZ> cloud;
+  float isolevel = 0.0f;
+  size_t count = 0;
+
+  LOG(INFO) << "iterating " << map_builder_->pose_graph()->GetAllSubmapData().size();
 
   // TODO allow for multiple submaps
-  if (!data.empty()) {
-    const auto submap3d =
-        static_cast<const ::cartographer::mapping::Submap3D *>(
-            data.begin()->data.submap.get());
-    const ::cartographer::mapping::HybridGridTSDF *tsdf;
-    if (kTsdfVisualizationHighRes) {
-      tsdf =
-          dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
-              &submap3d->high_resolution_hybrid_grid());
-    } else {
-      tsdf =
-          dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
-              &submap3d->low_resolution_hybrid_grid());
+  if (!all_submap_data.empty()) {
+    for (auto const &submap_data: all_submap_data) {
+
+      auto submap3d =
+          dynamic_cast<const ::cartographer::mapping::Submap3D *>(
+              submap_data.data.submap.get());
+      auto local_pose = submap_data.data.pose;
+
+      LOG(INFO) << "local pose: " << local_pose;
+      LOG(INFO) << "submap pose: " << submap3d->local_pose();
+      //    LOG(INFO) << "poses iter: " << submap_poses_iter->data.pose;
+
+      const ::cartographer::mapping::HybridGridTSDF *tsdf;
+      if (kTsdfVisualizationHighRes) {
+        tsdf =
+            dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
+                &submap3d->high_resolution_hybrid_grid());
+      } else {
+        tsdf =
+            dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
+                &submap3d->low_resolution_hybrid_grid());
+      }
+
+      float resolution = tsdf->resolution();
+
+      for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf);
+           !it.Done(); it.Next()) {
+        const ::cartographer::mapping::TSDFVoxel voxel = it.GetValue();
+        const float tsd = tsdf->ValueConverter().ValueToTSD(voxel.discrete_tsd);
+        const Eigen::Vector3f cell_center_submap = tsdf->GetCenterOfCell(it.GetCellIndex());
+        const Eigen::Vector3f
+            cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
+        auto local_trajectory_data = GetLocalTrajectoryData();
+        auto robot_position = local_trajectory_data[0].local_slam_data->local_pose.translation();
+
+        if (voxel.discrete_weight == 0) {
+          // Skip inner-object voxels
+          continue;
+        }
+
+        if (cut_off_distance >= 0.0f &&
+            (robot_position.cast<float>() - cell_center_global).norm() > cut_off_distance) {
+          // Cut-off cells that are too far away from the robot, if parameter valid (>0)
+          continue;
+        }
+
+        if (cut_off_height >= 0.0f &&
+            cell_center_global.z() - static_cast<float>(robot_position.z()) > cut_off_height) {
+          // Cut-off cells that are too high above the robot, if parameter valid (>0)
+          continue;
+        }
+
+        Cube cube;
+        for (int i = 0; i < 8; ++i) {
+          cube.vertice_ids[i] = it.GetCellIndex();
+          cube.vertice_ids[i].x() += cube.position_arr[i][0];
+          cube.vertice_ids[i].y() += cube.position_arr[i][1];
+          cube.vertice_ids[i].z() += cube.position_arr[i][2];
+          cube.vertice_pos_global[i].x =
+              cell_center_global.x() + static_cast<float>(cube.position_arr[i][0]) * resolution;
+          cube.vertice_pos_global[i].y =
+              cell_center_global.y() + static_cast<float>(cube.position_arr[i][1]) * resolution;
+          cube.vertice_pos_global[i].z =
+              cell_center_global.z() + static_cast<float>(cube.position_arr[i][2]) * resolution;
+          cube.tsd_weights[i] = tsdf->GetWeight(cube.vertice_ids[i]);
+
+          cube.tsd_values[i] =
+              cube.tsd_weights[i] <= 0.0f ? tsd : tsdf->GetTSD(cube.vertice_ids[i]);
+        }
+        count += ProcessCube(cube, cloud, isolevel);
+
+      }
     }
-    pcl::PointCloud<pcl::PointXYZ> cloud;
-    auto local_trajectory_data = GetLocalTrajectoryData();
-    auto robot_position = local_trajectory_data[0].local_slam_data->local_pose.translation();
-
-    float resolution = tsdf->resolution();
-    float isolevel = 0.0f;
-    size_t count = 0;
-
-    for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf);
-         !it.Done(); it.Next()) {
-      const ::cartographer::mapping::TSDFVoxel voxel = it.GetValue();
-      const float tsd = tsdf->ValueConverter().ValueToTSD(voxel.discrete_tsd);
-      const Eigen::Vector3f cell_center_submap = tsdf->GetCenterOfCell(it.GetCellIndex());
-      const Eigen::Vector3f
-          cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
-
-      if (voxel.discrete_weight == 0) {
-        // Skip inner-object voxels
-        continue;
-      }
-
-      if (cut_off_distance >= 0.0f &&
-          (robot_position.cast<float>() - cell_center_global).norm() > cut_off_distance) {
-        // Cut-off cells that are too far away from the robot, if parameter valid (>0)
-        continue;
-      }
-
-      if (cut_off_height >= 0.0f &&
-          cell_center_global.z() - static_cast<float>(robot_position.z()) > cut_off_height) {
-        // Cut-off cells that are too high above the robot, if parameter valid (>0)
-        continue;
-      }
-
-      Cube cube;
-      for (int i = 0; i < 8; ++i) {
-        cube.vertice_ids[i] = it.GetCellIndex();
-        cube.vertice_ids[i].x() += cube.position_arr[i][0];
-        cube.vertice_ids[i].y() += cube.position_arr[i][1];
-        cube.vertice_ids[i].z() += cube.position_arr[i][2];
-        cube.vertice_pos_global[i].x =
-            cell_center_global.x() + static_cast<float>(cube.position_arr[i][0]) * resolution;
-        cube.vertice_pos_global[i].y =
-            cell_center_global.y() + static_cast<float>(cube.position_arr[i][1]) * resolution;
-        cube.vertice_pos_global[i].z =
-            cell_center_global.z() + static_cast<float>(cube.position_arr[i][2]) * resolution;
-        cube.tsd_weights[i] = tsdf->GetWeight(cube.vertice_ids[i]);
-
-        cube.tsd_values[i] =
-            cube.tsd_weights[i] <= 0.0f ? tsd : tsdf->GetTSD(cube.vertice_ids[i]);
-      }
-      count += ProcessCube(cube, cloud, isolevel);
-
-    }
-    LOG(INFO) << "A total of " << count << " triangles are processed. Points in Cloud: "
-              << cloud.size();
+    LOG(INFO) << "Triangles in Cloud: " << cloud.size() / 3;
 
     pcl::toPCLPointCloud2(cloud, mesh.cloud);
 
