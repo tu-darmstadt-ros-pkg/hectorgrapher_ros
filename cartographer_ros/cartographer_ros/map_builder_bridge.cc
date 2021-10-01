@@ -704,6 +704,7 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
       ::cartographer::mapping::PoseGraphInterface::SubmapData>
       data = map_builder_->pose_graph()->GetAllSubmapData();
 
+  // TODO allow for multiple submaps
   if (!data.empty()) {
     const auto submap3d =
         static_cast<const ::cartographer::mapping::Submap3D *>(
