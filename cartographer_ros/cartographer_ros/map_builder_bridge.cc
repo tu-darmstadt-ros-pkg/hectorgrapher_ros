@@ -700,8 +700,6 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
                                        float cut_off_distance,
                                        float cut_off_height) {
   auto all_submap_data = map_builder_->pose_graph()->GetAllSubmapData();
-//  auto submap_poses_iter = map_builder_->pose_graph()->GetAllSubmapPoses().begin();
-//  auto submap_trajectories = map_builder_->pose_graph()->GetTrajectoryData();
 
   pcl::PointCloud<pcl::PointXYZ> cloud;
   float isolevel = 0.0f;
@@ -711,16 +709,11 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
 
   // TODO allow for multiple submaps
   if (!all_submap_data.empty()) {
-    for (auto const &submap_data: all_submap_data) {
+    for (auto const & submap_data : all_submap_data) {
 
       auto submap3d =
           dynamic_cast<const ::cartographer::mapping::Submap3D *>(
               submap_data.data.submap.get());
-      auto local_pose = submap_data.data.pose;
-
-      LOG(INFO) << "local pose: " << local_pose;
-      LOG(INFO) << "submap pose: " << submap3d->local_pose();
-      //    LOG(INFO) << "poses iter: " << submap_poses_iter->data.pose;
 
       const ::cartographer::mapping::HybridGridTSDF *tsdf;
       if (kTsdfVisualizationHighRes) {
@@ -734,6 +727,9 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
       }
 
       float resolution = tsdf->resolution();
+      auto local_trajectory_data = GetLocalTrajectoryData();
+      auto robot_position = local_trajectory_data.begin()->second.local_slam_data->local_pose.translation();
+//        auto robot_position = map_builder_->pose_graph()->GetTrajectoryNodes().begin()->data.global_pose.translation();
 
       for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf);
            !it.Done(); it.Next()) {
@@ -742,8 +738,6 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
         const Eigen::Vector3f cell_center_submap = tsdf->GetCenterOfCell(it.GetCellIndex());
         const Eigen::Vector3f
             cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
-        auto local_trajectory_data = GetLocalTrajectoryData();
-        auto robot_position = local_trajectory_data[0].local_slam_data->local_pose.translation();
 
         if (voxel.discrete_weight == 0) {
           // Skip inner-object voxels
