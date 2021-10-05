@@ -162,8 +162,9 @@ class MapBuilderBridge {
    * values indicate no cut-off along this dimension
    * @param cut_off_height float as cut-off-height above the robots current height. Negative values
    * indicate no cut-off along this dimension
+   * @param min_weight minimal weight of TSD value TO BE DISCARDED when iterating the TSDF voxels
    */
-  void ProcessTSDFMesh(pcl::PolygonMesh &mesh, float cut_off_distance, float cut_off_height);
+  void ProcessTSDFMesh(pcl::PolygonMesh &mesh, float cut_off_distance, float cut_off_height, float min_weight);
 
   /**
    * Uses a visualization_msgs::Marker Triangle_List as representation for the surface mesh
@@ -178,7 +179,7 @@ class MapBuilderBridge {
    * @param filename
    * @return status of thefile writing
    */
-  bool WriteTSDFMesh(const std::string &filename);
+  bool WriteTSDFMesh(const std::string &filename, const float min_weight);
 
   /**
    * Creates a surface representation of the TSDF map as points within a certain cut-off distance
