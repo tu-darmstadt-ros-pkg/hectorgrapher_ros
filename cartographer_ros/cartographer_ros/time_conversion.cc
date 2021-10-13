@@ -18,10 +18,17 @@
 
 #include "cartographer/common/time.h"
 #include "ros/ros.h"
+#include "glog/logging.h"
 
 namespace cartographer_ros {
 
 ::ros::Time ToRos(::cartographer::common::Time time) {
+    if(time == ::cartographer::common::Time()) {
+        ::ros::Time ros_time;
+        ros_time.fromSec(0);
+//        LOG(WARNING) << "Defaulting ros_time to zero!";
+        return ros_time;
+    }
   int64_t uts_timestamp = ::cartographer::common::ToUniversal(time);
   int64_t ns_since_unix_epoch =
       (uts_timestamp -

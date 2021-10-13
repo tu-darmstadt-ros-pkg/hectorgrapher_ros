@@ -68,6 +68,28 @@ if(DEFINED urdfdom_headers_VERSION)
   endif()
 endif()
 
+# Open3D
+option(WITH_OPEN3D "build with open3d support" true)
+
+if(${WITH_OPEN3D})
+  #  find_package(Open3D HINTS ${CMAKE_INSTALL_PREFIX}/lib/CMake)
+  find_package(Open3D REQUIRED)
+  list(APPEND Open3D_LIBRARIES dl)
+  if (Open3D_FOUND)
+    message(STATUS "Found Open3D ${Open3D_VERSION}")
+    add_definitions(-DUNIX)
+    add_compile_options(-Wno-deprecated-declarations)
+    add_compile_options(-Wno-unused-result)
+    add_definitions(-O3)
+  else ()
+    message(SEND_ERROR "Open3D not found")
+  endif ()
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${Open3D_C_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Open3D_CXX_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${Open3D_EXE_LINKER_FLAGS}")
+  add_definitions(-DWITH_OPEN3D)
+endif()
+
 include_directories(
   ${urdfdom_headers_INCLUDE_DIRS}
 )
