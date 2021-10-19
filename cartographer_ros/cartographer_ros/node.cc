@@ -137,6 +137,8 @@ Node::Node(
       kWriteTsdfMeshServiceName, &Node::HandleWriteTsdfMesh, this));
   service_servers_.push_back(node_handle_.advertiseService(
       kEnableMapUpdateServiceName, &Node::HandleEnableMapUpdateState, this));
+  service_servers_.push_back(node_handle_.advertiseService(
+      kUseScanMatchingServiceName, &Node::HandleUseScanMatchingState, this));
   tsdf_mesh_marker_publisher_ = node_handle_.advertise<::visualization_msgs::Marker>(
       kTSDFMeshMarkerTopic, kLatestOnlyPublisherQueueSize);
   tsdf_points_marker_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2>(
@@ -807,6 +809,14 @@ bool Node::HandleEnableMapUpdateState(std_srvs::SetBool::Request& request,
   response.success = true;
   return true;
 }
+bool Node::HandleUseScanMatchingState(std_srvs::SetBool::Request& request,
+                                      std_srvs::SetBool::Response& response) {
+  absl::MutexLock lock(&mutex_);
+  LOG(INFO) << "Setting UseScanMatching to " << bool(request.data);
+  map_builder_bridge_.map_builder_->UseScanMatching(bool(request.data));
+  response.success = true;
+  return true;
+}
 
 bool Node::HandleWriteState(
     ::cartographer_ros_msgs::WriteState::Request& request,
@@ -845,7 +855,7 @@ bool Node::HandleWriteTsdfMesh(
     ::cartographer_ros_msgs::WriteTsdfMesh::Request &request,
     ::cartographer_ros_msgs::WriteTsdfMesh::Response &response) {
   absl::MutexLock lock(&mutex_);
-  if (map_builder_bridge_.WriteTSDFMesh(request.filename)) {
+  if (map_builder_bridge_.WriteTSDFMesh(request.filename, request.min_weight)) {
     response.status.code = cartographer_ros_msgs::StatusCode::OK;
     response.status.message =
         absl::StrCat("State written to '", request.filename, "'.");

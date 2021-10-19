@@ -698,7 +698,8 @@ int MapBuilderBridge::ProcessCube(Cube &cube,
 
 void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
                                        float cut_off_distance,
-                                       float cut_off_height) {
+                                       float cut_off_height,
+                                       float min_weight) {
   ::cartographer::mapping::MapById<
       ::cartographer::mapping::SubmapId,
       ::cartographer::mapping::PoseGraphInterface::SubmapData>
@@ -734,7 +735,7 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
       const Eigen::Vector3f
           cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
 
-      if (voxel.discrete_weight == 0) {
+      if (voxel.discrete_weight <= min_weight) {
         // Skip inner-object voxels
         continue;
       }
@@ -791,7 +792,8 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMeshMarker() {
   pcl::PolygonMesh mesh;
   ProcessTSDFMesh(mesh,
                   static_cast<float>(cartographer_ros::kTsdfMeshCutOffDistance),
-                  static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight));
+                  static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight),
+                  0.0f);
 
   std_msgs::ColorRGBA color;
   marker.header.frame_id = "world_cartographer";
@@ -840,9 +842,9 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMeshMarker() {
   return marker;
 }
 
-bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename) {
+bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename, const float min_weight) {
   pcl::PolygonMesh mesh;
-  ProcessTSDFMesh(mesh, -1.0f, -1.0f);
+  ProcessTSDFMesh(mesh, -1.0f, -1.0f, min_weight);
 
   pcl::PointCloud<pcl::PointXYZ> cloud;
   pcl::fromPCLPointCloud2(mesh.cloud, cloud);
