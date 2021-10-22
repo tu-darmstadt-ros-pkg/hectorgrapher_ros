@@ -720,8 +720,8 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
               &submap3d->low_resolution_hybrid_grid());
     }
     pcl::PointCloud<pcl::PointXYZ> cloud;
-//    auto local_trajectory_data = GetLocalTrajectoryData();
-    const auto &robot_position = GetLocalTrajectoryData()[0].local_slam_data->local_pose.translation();
+    const auto
+        &robot_position = GetLocalTrajectoryData()[0].local_slam_data->local_pose.translation();
 
     float resolution = tsdf->resolution();
     float isolevel = 0.0f;
@@ -934,8 +934,8 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFPointsMarker() {
               &submap3d->low_resolution_hybrid_grid());
     }
     std::vector<Eigen::Array4f> cells;
-//    auto local_trajectory_data = GetLocalTrajectoryData();
-    const auto &robot_position = GetLocalTrajectoryData()[0].local_slam_data->local_pose.translation();
+    const auto
+        &robot_position = GetLocalTrajectoryData()[0].local_slam_data->local_pose.translation();
     float resolution = tsdf->resolution();
 
     for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf); !it.Done();
@@ -1000,8 +1000,8 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFSliceMarker() {
     }
 
     std::vector<Eigen::Array4f> cells;
-//    auto local_trajectory_data = GetLocalTrajectoryData();
-    const auto &robot_position = GetLocalTrajectoryData()[0].local_slam_data->local_pose.translation();
+    const auto
+        &robot_position = GetLocalTrajectoryData()[0].local_slam_data->local_pose.translation();
     float resolution = tsdf->resolution();
 
     for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf); !it.Done();
