@@ -145,7 +145,7 @@ class MapBuilderBridge {
   /**
    * Performs Marching Cubes on a MapBuilderBridge::Cube element representing a TSDF voxel in space.
    * Every found zero-crossing on an edge is registered in the cloud as a 3D point, but always in
-   * triplets so that points 0-1-2, 3-4-5, etc. form a triangle represrnting the mesh surface.
+   * triplets so that points 0-1-2, 3-4-5, etc. form a triangle representing the mesh surface.
    * Implementation inspired by Isaac Zhang: https://github.com/zhangxiaoxuan1/tsdfprocessor/blob/cdbc42300a9f5a72411b052a04c7972cef30f3f5/marching_cubes.cpp
    * @param cube pointer to an MapBuilderBridge::Cube element representing a TSDF voxel
    * @param cloud pointer to a PCL pointcloud to store the found triangle vertices
@@ -169,24 +169,34 @@ class MapBuilderBridge {
   /**
    * Uses a visualization_msgs::Marker Triangle_List as representation for the surface mesh
    * retrieved from ProcessTSDFMesh to display in Rviz, where the colors are chosen according to the
-   * surface normals
+   * surface normals. Takes points from the TSDF map within a certain cut-off distance and cut-off
+   * height from the robot, specifiable using dynamic_reconfigure parameters.
    * @return visualization_msgs::Marker
    */
-  visualization_msgs::Marker GetTSDFMesh();
+  visualization_msgs::Marker GetTSDFMeshMarker();
 
   /**
-   * Service routine to write the TSDF mesh representation as PLY file
+   * Service routine to write the TSDF mesh representation as PLY file. Whether the high or low
+   * resolution TSDF map is used depends on the corresponding dynamic parameter
    * @param filename
-   * @return status of thefile writing
+   * @return status of the file writing
    */
   bool WriteTSDFMesh(const std::string &filename, const float min_weight);
 
   /**
    * Creates a surface representation of the TSDF map as points within a certain cut-off distance
-   * from the robot. Intensity channel is used as TSD value.
+   * and cut-off height from the robot, specifiable using dynamic_reconfigure parameters.
+   * Intensity channel is used as TSD value.
    * @return sensor_msgs::PointCloud2
    */
-  sensor_msgs::PointCloud2 GetTSDF();
+  sensor_msgs::PointCloud2 GetTSDFPointsMarker();
+
+  /**
+   * Creates a slice of the TSDF map in all 3 dimensions around a position determined by
+   * dynamic_reconfigure parameters
+   * @return sensor_msgs::PointCloud2
+   */
+  sensor_msgs::PointCloud2 GetTSDFSliceMarker();
 
   SensorBridge *sensor_bridge(int trajectory_id);
   std::unique_ptr<cartographer::mapping::MapBuilderInterface> map_builder_;
