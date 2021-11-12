@@ -708,9 +708,6 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
   size_t count = 0;
   bool skipped_current_submap = false;
 
-  // TODO remove
-  LOG(INFO) << "iterating " << map_builder_->pose_graph()->GetAllSubmapData().size();
-
   if (!all_submap_data.empty()) {
     for (auto const & submap_data : all_submap_data) {
       if (!all_submaps && all_submap_data.size() > 1 && !skipped_current_submap) {
@@ -783,7 +780,7 @@ void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
 
       }
     }
-    LOG(INFO) << "Triangles in Cloud: " << cloud.size() / 3;
+    LOG(INFO) << "[TSDF Mesh] Triangles in Cloud: " << cloud.size() / 3;
 
     pcl::toPCLPointCloud2(cloud, mesh.cloud);
 
