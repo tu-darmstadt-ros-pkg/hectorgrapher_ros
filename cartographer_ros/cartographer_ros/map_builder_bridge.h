@@ -163,8 +163,14 @@ class MapBuilderBridge {
    * @param cut_off_height float as cut-off-height above the robots current height. Negative values
    * indicate no cut-off along this dimension
    * @param min_weight minimal weight of TSD value TO BE DISCARDED when iterating the TSDF voxels
+   * @param all_submaps if true, all submaps will be iterated, possible having duplicates. Otherwise
+   * the second last submap will be used except if there is only one
    */
-  void ProcessTSDFMesh(pcl::PolygonMesh &mesh, float cut_off_distance, float cut_off_height, float min_weight);
+  void ProcessTSDFMesh(pcl::PolygonMesh &mesh,
+                       float cut_off_distance,
+                       float cut_off_height,
+                       float min_weight,
+                       bool all_submaps);
 
   /**
    * Uses a visualization_msgs::Marker Triangle_List as representation for the surface mesh
