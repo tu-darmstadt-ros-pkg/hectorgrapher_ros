@@ -117,10 +117,11 @@ class MapBuilderBridge {
   /**
    * Service routine to write the TSDF mesh representation as PLY file. Whether the high or low
    * resolution TSDF map is used depends on the corresponding dynamic parameter
-   * @param filename
+   * @param filename filename without file ending. PLY will be appended automatically
+   * @param min_weight minimum TSD value of the voxels to consider
    * @return status of the file writing
    */
-  bool WriteTSDFMesh(const std::string &filename, const float min_weight);
+  bool WriteTSDFMesh(const std::string &filename, float min_weight);
 
   /**
    * Creates a surface representation of the TSDF map as points within a certain cut-off distance

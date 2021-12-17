@@ -533,14 +533,13 @@ visualization_msgs::MarkerArray MapBuilderBridge::GetConstraintList() {
 }
 
 visualization_msgs::Marker MapBuilderBridge::GetTSDFMeshMarker() {
-  cartographer::mapping::MarchingCubes marching_cubes_handler;
   visualization_msgs::Marker marker;
   pcl::PolygonMesh mesh;
   const auto &all_submap_data = map_builder_->pose_graph()->GetAllSubmapData();
   const auto
       &robot_position = GetLocalTrajectoryData()[0].local_slam_data->local_pose.translation().cast<float>();
 
-  marching_cubes_handler.ProcessTSDFMesh(mesh,
+  cartographer::mapping::MarchingCubes::ProcessTSDFMesh(mesh,
                   all_submap_data,
                   robot_position,
                   kTsdfVisualizationHighRes,
@@ -597,12 +596,11 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMeshMarker() {
 }
 
 bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename, const float min_weight) {
-  cartographer::mapping::MarchingCubes marching_cubes_handler;
   pcl::PolygonMesh mesh;
   const auto &all_submap_data = map_builder_->pose_graph()->GetAllSubmapData();
   const auto &robot_position = Eigen::Matrix<float, 3, 1>{NAN, NAN, NAN};
 
-  marching_cubes_handler.ProcessTSDFMesh(mesh,
+  cartographer::mapping::MarchingCubes::ProcessTSDFMesh(mesh,
                   all_submap_data,
                   robot_position,
                   kTsdfVisualizationHighRes,
@@ -611,8 +609,11 @@ bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename, const float mi
                   min_weight,
                   true);
 
+  std::stringstream stream;
+  cartographer::mapping::MarchingCubes::WriteTSDFToStringstream(stream, mesh);
+  stream.seekg(0, std::ios::end);
   std::ofstream file(filename + ".ply", std::ofstream::out | std::ofstream::binary);
-  marching_cubes_handler.WriteTSDFToPLYFile(file, mesh);
+  file.write(stream.str().data(), stream.tellg());
   file.close();
   LOG(INFO) << "Exported TSDF Mesh as PLY to "
             << boost::filesystem::complete(filename + ".ply").string();
@@ -654,10 +655,10 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFPointsMarker() {
       const Eigen::Vector3f
           cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
 
-      if (voxel.discrete_weight == 0) {
-        // Skip inner-object voxels
-        continue;
-      }
+//      if (tsd <= 0.0f) {
+//        // Skip inner-object voxels with TSD < 0 with TSD in [min_tsd, max_tsd], eg [-0.25, 0.25]
+//        continue;
+//      }
 
       if ((robot_position.cast<float>() - cell_center_global).norm()
           > static_cast<float>(cartographer_ros::kTsdfPointsCutOffDistance)) {
@@ -731,10 +732,10 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFSliceMarker() {
 
       Eigen::Vector3f slice_center = {slice_center_x, slice_center_y, slice_center_z};
 
-      if (voxel.discrete_weight == 0) {
-        // Skip inner-object voxels
-        continue;
-      }
+//      if (tsd <= 0.0f) {
+//        // Skip inner-object voxels with TSD < 0 with TSD in [min_tsd, max_tsd], eg [-0.25, 0.25]
+//        continue;
+//      }
 
       if ((slice_center - cell_center_global).norm()
           > static_cast<float>(cartographer_ros::kTsdfSliceCutOffDistance)) {
