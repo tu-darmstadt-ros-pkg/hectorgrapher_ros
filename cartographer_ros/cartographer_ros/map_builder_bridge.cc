@@ -536,60 +536,63 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMeshMarker() {
   visualization_msgs::Marker marker;
   pcl::PolygonMesh mesh;
   const auto &all_submap_data = map_builder_->pose_graph()->GetAllSubmapData();
-  const auto
-      &robot_position = GetLocalTrajectoryData()[0].local_slam_data->local_pose.translation().cast<float>();
+  if (!all_submap_data.empty()) {
+    const auto
+        &robot_position =
+        GetLocalTrajectoryData()[0].local_slam_data->local_pose.translation().cast<float>();
 
-  cartographer::mapping::MarchingCubes::ProcessTSDFMesh(mesh,
-                  all_submap_data,
-                  robot_position,
-                  kTsdfVisualizationHighRes,
-                  static_cast<float>(cartographer_ros::kTsdfMeshCutOffDistance),
-                  static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight),
-                  0.0f,
-                  false);
+    cartographer::mapping::MarchingCubes::ProcessTSDFMesh(mesh,
+                                                          all_submap_data,
+                                                          robot_position,
+                                                          kTsdfVisualizationHighRes,
+                                                          static_cast<float>(cartographer_ros::kTsdfMeshCutOffDistance),
+                                                          static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight),
+                                                          0.0f,
+                                                          false);
 
-  std_msgs::ColorRGBA color;
-  marker.header.frame_id = "world_cartographer";
-  marker.header.stamp = ::ros::Time::now();
-  marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
-  marker.action = visualization_msgs::Marker::ADD;
-  marker.scale.x = 1.0;
-  marker.scale.y = 1.0;
-  marker.scale.z = 1.0;
-  marker.pose.position.x = 0.0;
-  marker.pose.position.y = 0.0;
-  marker.pose.position.z = 0.0;
-  marker.pose.orientation.x = 0.0;
-  marker.pose.orientation.y = 0.0;
-  marker.pose.orientation.z = 0.0;
-  marker.pose.orientation.w = 1.0;
+    std_msgs::ColorRGBA color;
+    marker.header.frame_id = "world_cartographer";
+    marker.header.stamp = ::ros::Time::now();
+    marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.scale.x = 1.0;
+    marker.scale.y = 1.0;
+    marker.scale.z = 1.0;
+    marker.pose.position.x = 0.0;
+    marker.pose.position.y = 0.0;
+    marker.pose.position.z = 0.0;
+    marker.pose.orientation.x = 0.0;
+    marker.pose.orientation.y = 0.0;
+    marker.pose.orientation.z = 0.0;
+    marker.pose.orientation.w = 1.0;
 
-  pcl::PointCloud<pcl::PointXYZ> cloud;
-  pcl::fromPCLPointCloud2(mesh.cloud, cloud);
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+    pcl::fromPCLPointCloud2(mesh.cloud, cloud);
 
-  for (auto &vertice_group : mesh.polygons) {
-    for (auto &vertice : vertice_group.vertices) {
-      geometry_msgs::Point temp_point;
-      temp_point.x = cloud[vertice].x;
-      temp_point.y = cloud[vertice].y;
-      temp_point.z = cloud[vertice].z;
-      marker.points.push_back(temp_point);
+    for (auto &vertice_group: mesh.polygons) {
+      for (auto &vertice: vertice_group.vertices) {
+        geometry_msgs::Point temp_point;
+        temp_point.x = cloud[vertice].x;
+        temp_point.y = cloud[vertice].y;
+        temp_point.z = cloud[vertice].z;
+        marker.points.push_back(temp_point);
+      }
+      Eigen::Vector3f u = {cloud[vertice_group.vertices[1]].x - cloud[vertice_group.vertices[0]].x,
+                           cloud[vertice_group.vertices[1]].y - cloud[vertice_group.vertices[0]].y,
+                           cloud[vertice_group.vertices[1]].z - cloud[vertice_group.vertices[0]].z};
+      Eigen::Vector3f v = {cloud[vertice_group.vertices[2]].x - cloud[vertice_group.vertices[0]].x,
+                           cloud[vertice_group.vertices[2]].y - cloud[vertice_group.vertices[0]].y,
+                           cloud[vertice_group.vertices[2]].z - cloud[vertice_group.vertices[0]].z};
+      Eigen::Vector3f normal = u.cross(v).normalized();
+      std_msgs::ColorRGBA surface_color;
+      surface_color.r = (normal.x() + 1.0f) * 0.5f;
+      surface_color.g = (normal.y() + 1.0f) * 0.5f;
+      surface_color.b = (normal.z() + 1.0f) * 0.5f;
+      surface_color.a = 1;
+      marker.colors.push_back(surface_color);
+      marker.colors.push_back(surface_color);
+      marker.colors.push_back(surface_color);
     }
-    Eigen::Vector3f u = {cloud[vertice_group.vertices[1]].x - cloud[vertice_group.vertices[0]].x,
-                         cloud[vertice_group.vertices[1]].y - cloud[vertice_group.vertices[0]].y,
-                         cloud[vertice_group.vertices[1]].z - cloud[vertice_group.vertices[0]].z};
-    Eigen::Vector3f v = {cloud[vertice_group.vertices[2]].x - cloud[vertice_group.vertices[0]].x,
-                         cloud[vertice_group.vertices[2]].y - cloud[vertice_group.vertices[0]].y,
-                         cloud[vertice_group.vertices[2]].z - cloud[vertice_group.vertices[0]].z};
-    Eigen::Vector3f normal = u.cross(v).normalized();
-    std_msgs::ColorRGBA surface_color;
-    surface_color.r = (normal.x() + 1.0f) * 0.5f;
-    surface_color.g = (normal.y() + 1.0f) * 0.5f;
-    surface_color.b = (normal.z() + 1.0f) * 0.5f;
-    surface_color.a = 1;
-    marker.colors.push_back(surface_color);
-    marker.colors.push_back(surface_color);
-    marker.colors.push_back(surface_color);
   }
 
   return marker;
@@ -601,13 +604,13 @@ bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename, const float mi
   const auto &robot_position = Eigen::Matrix<float, 3, 1>{NAN, NAN, NAN};
 
   cartographer::mapping::MarchingCubes::ProcessTSDFMesh(mesh,
-                  all_submap_data,
-                  robot_position,
-                  kTsdfVisualizationHighRes,
-                  -1.0f,
-                  -1.0f,
-                  min_weight,
-                  true);
+                                                        all_submap_data,
+                                                        robot_position,
+                                                        kTsdfVisualizationHighRes,
+                                                        -1.0f,
+                                                        -1.0f,
+                                                        min_weight,
+                                                        true);
 
   std::stringstream stream;
   cartographer::mapping::MarchingCubes::WriteTSDFToStringstream(stream, mesh);
@@ -655,10 +658,10 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFPointsMarker() {
       const Eigen::Vector3f
           cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
 
-//      if (tsd <= 0.0f) {
-//        // Skip inner-object voxels with TSD < 0 with TSD in [min_tsd, max_tsd], eg [-0.25, 0.25]
-//        continue;
-//      }
+      if (tsd < 0.0f || tsd >= resolution || voxel.discrete_weight == 0) {
+        // Skip inner-object voxels with TSD < 0 with TSD in [min_tsd, max_tsd], eg [-0.25, 0.25]
+        continue;
+      }
 
       if ((robot_position.cast<float>() - cell_center_global).norm()
           > static_cast<float>(cartographer_ros::kTsdfPointsCutOffDistance)) {
@@ -672,10 +675,8 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFPointsMarker() {
         continue;
       }
 
-      if (tsd >= 0 && tsd < resolution) {
-        cells.emplace_back(cell_center_global[0], cell_center_global[1],
-                           cell_center_global[2], tsd);
-      }
+      cells.emplace_back(cell_center_global[0], cell_center_global[1],
+                         cell_center_global[2], tsd);
     }
 
     msg = ToPointCloud2Message(
@@ -732,10 +733,10 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFSliceMarker() {
 
       Eigen::Vector3f slice_center = {slice_center_x, slice_center_y, slice_center_z};
 
-//      if (tsd <= 0.0f) {
-//        // Skip inner-object voxels with TSD < 0 with TSD in [min_tsd, max_tsd], eg [-0.25, 0.25]
-//        continue;
-//      }
+      if (voxel.discrete_weight == 0) {
+        // Skip zero weight voxels
+        continue;
+      }
 
       if ((slice_center - cell_center_global).norm()
           > static_cast<float>(cartographer_ros::kTsdfSliceCutOffDistance)) {
