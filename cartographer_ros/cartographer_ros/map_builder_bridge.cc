@@ -228,15 +228,18 @@ cartographer_ros_msgs::SubmapList MapBuilderBridge::GetSubmapList() {
   submap_list.header.frame_id = node_options_.map_frame;
   for (const auto& submap_id_pose :
        map_builder_->pose_graph()->GetAllSubmapPoses()) {
-    cartographer_ros_msgs::SubmapEntry submap_entry;
-    submap_entry.is_frozen = map_builder_->pose_graph()->IsTrajectoryFrozen(
-        submap_id_pose.id.trajectory_id);
-    submap_entry.trajectory_id = submap_id_pose.id.trajectory_id;
-    submap_entry.submap_index = submap_id_pose.id.submap_index;
-    submap_entry.submap_version = submap_id_pose.data.version;
-    submap_entry.pose = ToGeometryMsgPose(submap_id_pose.data.pose);
-    submap_entry.start_stamp = ToRos(submap_id_pose.data.start_time);
-    submap_list.submap.push_back(submap_entry);
+//    if(submap_id_pose.data.start_time != 0) {
+      cartographer_ros_msgs::SubmapEntry submap_entry;
+      submap_entry.is_frozen = map_builder_->pose_graph()->IsTrajectoryFrozen(
+          submap_id_pose.id.trajectory_id);
+      submap_entry.trajectory_id = submap_id_pose.id.trajectory_id;
+      submap_entry.submap_index = submap_id_pose.id.submap_index;
+      submap_entry.submap_version = submap_id_pose.data.version;
+      submap_entry.pose = ToGeometryMsgPose(submap_id_pose.data.pose);
+//      LOG(INFO) << "start time " << submap_id_pose.data.start_time;
+//      submap_entry.start_stamp = ToRos(submap_id_pose.data.start_time);
+      submap_list.submap.push_back(submap_entry);
+//    }
   }
   return submap_list;
 }
