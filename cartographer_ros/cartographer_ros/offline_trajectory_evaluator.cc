@@ -36,7 +36,9 @@
 #include "ros/callback_queue.h"
 #include "rosgraph_msgs/Clock.h"
 #include "tf2/LinearMath/Matrix3x3.h"
+#include "tf2/LinearMath/Transform.h"
 #include "tf2/convert.h"
+#include "tf2/utils.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 #include "tf2_ros/static_transform_broadcaster.h"
 #include "urdf/model.h"
@@ -282,9 +284,9 @@ void RunOfflineTrajectoryEvaluator(
           ? playable_bag_multiplexer.PeekMessageTime()
           : ros::Time();
 
-  ros::Duration logging_interval = ros::Duration(0.1);
-  ros::Time last_logged_trajectory_data_time = begin_time - logging_interval;
-  ros::Time target_logged_trajectory_data_time = begin_time - logging_interval;
+//  ros::Duration logging_interval = ros::Duration(0.1);
+//  ros::Time last_logged_trajectory_data_time = begin_time - logging_interval;
+//  ros::Time target_logged_trajectory_data_time = begin_time - logging_interval;
 
   std::size_t idx_last_slash = bag_filenames[0].find_last_of("/\\");
   std::size_t idx_last_point = bag_filenames[0].find_last_of(".");
@@ -296,6 +298,9 @@ void RunOfflineTrajectoryEvaluator(
   (*trajectory_data_file) << "time,type,x,y,z,roll,pitch,yaw,qw,qx,qy,qz\n";
   cartographer::ground_truth::proto::GroundTruth ground_truth;
 
+  bool initialized = false;
+  ros::Time initial_time;
+  tf2::Transform initial_transform;
   while (playable_bag_multiplexer.IsMessageAvailable()) {
     if (!::ros::ok()) {
       return;
@@ -304,8 +309,6 @@ void RunOfflineTrajectoryEvaluator(
     const auto next_msg_tuple = playable_bag_multiplexer.GetNextMessage();
     const rosbag::MessageInstance& msg = std::get<0>(next_msg_tuple);
     const int bag_index = std::get<1>(next_msg_tuple);
-//    const bool is_last_message_in_bag = std::get<2>(next_msg_tuple);
-
     if (msg.getTime() < (begin_time + ros::Duration(FLAGS_skip_seconds))) {
       continue;
     }
@@ -334,73 +337,58 @@ void RunOfflineTrajectoryEvaluator(
     auto it = bag_topic_to_sensor_id.find(bag_topic);
     if (it != bag_topic_to_sensor_id.end()) {
 //      const std::string& sensor_id = it->second.id;
-
-      if (msg.isType<sensor_msgs::Imu>()) {
-        sensor_msgs::ImuConstPtr imu_msg = msg.instantiate<sensor_msgs::Imu>();
-        (*trajectory_data_file)
-            << (imu_msg->header.stamp - begin_time).toSec() << ","
-            << "IMU"
-            << "," << imu_msg->linear_acceleration.x << ","
-            << imu_msg->linear_acceleration.y << ","
-            << imu_msg->linear_acceleration.z << ","
-            << imu_msg->angular_velocity.x << "," << imu_msg->angular_velocity.y
-            << "," << imu_msg->angular_velocity.z << "\n";
-      }
-
-      //      if (msg.isType<nav_msgs::Odometry>()) {
-      //        node.HandleOdometryMessage(trajectory_id, sensor_id,
-      //                                   msg.instantiate<nav_msgs::Odometry>());
-      //      }
-    }
-
-    while (target_logged_trajectory_data_time < clock.clock) {
-      try {
-        geometry_msgs::TransformStamped transform_stamped =
-            tf_buffer.lookupTransform("world", "base_link",
-                                      target_logged_trajectory_data_time);
-        if (transform_stamped.header.stamp !=
-            last_logged_trajectory_data_time) {
-          tf2::Quaternion q;
-          tf2::fromMsg(transform_stamped.transform.rotation, q);
-          tf2::Matrix3x3 m(q);
-          double r, p, y;
-          m.getRPY(r, p, y);
-
-          (*trajectory_data_file)
-              << (transform_stamped.header.stamp - begin_time).toSec() << ","
-              << "TRACKING"
-              << "," << transform_stamped.transform.translation.x << ","
-              << transform_stamped.transform.translation.y << ","
-              << transform_stamped.transform.translation.z << "," << r << ","
-              << p << "," << y << "," << transform_stamped.transform.rotation.w
-              << "," << transform_stamped.transform.rotation.x << ","
-              << transform_stamped.transform.rotation.y << ","
-              << transform_stamped.transform.rotation.z << "\n";
-          last_logged_trajectory_data_time = transform_stamped.header.stamp;
-
-          geometry_msgs::TransformStamped transform_stamped_previous =
-              tf_buffer.lookupTransform(
-                  "world", "base_link",
-                  target_logged_trajectory_data_time - logging_interval);
-          ::cartographer::transform::Rigid3d delta =
-              ToRigid3d(transform_stamped_previous).inverse() *
-              ToRigid3d(transform_stamped);
-          auto* const new_relation = ground_truth.add_relation();
-          new_relation->set_timestamp1(
-              ToUniversal(FromRos(transform_stamped_previous.header.stamp)));
-          new_relation->set_timestamp2(
-              ToUniversal(FromRos(transform_stamped.header.stamp)));
-          *new_relation->mutable_expected() =
-              cartographer::transform::ToProto(delta);
-          new_relation->set_covered_distance(delta.translation().norm());
+      if (msg.isType<nav_msgs::Odometry>()) {
+        auto odom_msg = msg.instantiate<nav_msgs::Odometry>();
+        if (!initialized) {
+          initial_time = odom_msg->header.stamp;
+          initialized = true;
+          tf2::Vector3 origin = {odom_msg->pose.pose.position.x,
+                                 odom_msg->pose.pose.position.y,
+                                 odom_msg->pose.pose.position.z};
+          initial_transform.setOrigin(origin);
+          tf2::Quaternion rotation = {odom_msg->pose.pose.orientation.x,
+                                      odom_msg->pose.pose.orientation.y,
+                                      odom_msg->pose.pose.orientation.z,
+                                      odom_msg->pose.pose.orientation.w};
+          initial_transform.setRotation(rotation);
+          continue;
         }
-      } catch (const tf2::TransformException& ex) {
-        LOG_EVERY_N(WARNING, 100) << ex.what();
+
+        tf2::Vector3 origin = {odom_msg->pose.pose.position.x,
+                               odom_msg->pose.pose.position.y,
+                               odom_msg->pose.pose.position.z};
+        tf2::Quaternion rotation = {odom_msg->pose.pose.orientation.x,
+                                    odom_msg->pose.pose.orientation.y,
+                                    odom_msg->pose.pose.orientation.z,
+                                    odom_msg->pose.pose.orientation.w};
+        tf2::Transform current_pose(rotation, origin);
+
+        tf2::Matrix3x3 m(rotation);
+        double r, p, y;
+        m.getRPY(r, p, y);
+        (*trajectory_data_file)
+            << (odom_msg->header.stamp - initial_time).toSec() << ","
+            << "TRACKING"
+            << "," << origin.x() << "," << origin.y() << "," << origin.z()
+            << "," << r << "," << p << "," << y << "," << rotation.w() << ","
+            << rotation.x() << "," << rotation.y() << "," << rotation.z()
+            << "\n";
+
+//        last_logged_trajectory_data_time = odom_msg->header.stamp;
+        tf2::Transform relative_transform =
+            initial_transform.inverse() * current_pose;
+
+        auto* const new_relation = ground_truth.add_relation();
+        new_relation->set_timestamp1(ToUniversal(FromRos(initial_time)));
+        new_relation->set_timestamp2(
+            ToUniversal(FromRos(odom_msg->header.stamp)));
+
+        *new_relation->mutable_expected() =
+            cartographer::transform::ToProto(ToRigid3d(relative_transform));
+        new_relation->set_covered_distance(
+            relative_transform.getOrigin().length());
       }
-
-      target_logged_trajectory_data_time += logging_interval;
     }
-
     clock.clock = msg.getTime();
     clock_publisher.publish(clock);
   }
@@ -408,8 +396,8 @@ void RunOfflineTrajectoryEvaluator(
 
   std::string output_filename =
       std::string("ground_truth_") + stripped_bag_filename + ".pb";
-  LOG(INFO) << "Writing " << ground_truth.relation_size() << " relations to '"
-            << output_filename << "'.";
+  LOG(INFO) << "Writing " << ground_truth.relation_size()
+            << " gt relations to '" << output_filename << "'.";
 
   std::ofstream output_stream(output_filename,
                               std::ios_base::out | std::ios_base::binary);

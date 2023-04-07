@@ -482,6 +482,13 @@ Rigid3d ToRigid3d(const geometry_msgs::TransformStamped& transform) {
                  ToEigen(transform.transform.rotation));
 }
 
+Rigid3d ToRigid3d(const tf2::Transform& transform) {
+  return Rigid3d({transform.getOrigin().x(), transform.getOrigin().y(),
+                  transform.getOrigin().z()},
+                 {transform.getRotation().w(), transform.getRotation().x(),
+                  transform.getRotation().y(), transform.getRotation().z()});
+}
+
 Rigid3d ToRigid3d(const geometry_msgs::Pose& pose) {
   return Rigid3d({pose.position.x, pose.position.y, pose.position.z},
                  ToEigen(pose.orientation));

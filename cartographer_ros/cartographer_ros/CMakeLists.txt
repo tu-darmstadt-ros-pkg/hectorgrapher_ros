@@ -47,6 +47,18 @@ install(TARGETS cartographer_offline_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
+
+google_binary(cartographer_offline_trajectory_evaluator
+        SRCS
+        offline_trajectory_evaluator_main.cc
+        )
+
+install(TARGETS cartographer_offline_trajectory_evaluator
+        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+        )
+
 google_binary(cartographer_occupancy_grid_node
   SRCS
     occupancy_grid_node_main.cc

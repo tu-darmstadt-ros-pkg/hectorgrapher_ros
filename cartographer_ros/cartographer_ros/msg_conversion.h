@@ -31,6 +31,7 @@
 #include "sensor_msgs/LaserScan.h"
 #include "sensor_msgs/MultiEchoLaserScan.h"
 #include "sensor_msgs/PointCloud2.h"
+#include "tf2/LinearMath/Transform.h"
 
 namespace cartographer_ros {
 
@@ -74,6 +75,8 @@ ToStructuredPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg);
 
 ::cartographer::transform::Rigid3d ToRigid3d(
     const geometry_msgs::TransformStamped& transform);
+
+::cartographer::transform::Rigid3d ToRigid3d(const tf2::Transform& transform);
 
 ::cartographer::transform::Rigid3d ToRigid3d(const geometry_msgs::Pose& pose);
 
