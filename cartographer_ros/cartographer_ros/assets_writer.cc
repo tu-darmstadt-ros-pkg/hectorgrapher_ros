@@ -104,8 +104,19 @@ std::unique_ptr<carto::io::PointsBatch> HandleMessage(
 
   carto::sensor::PointCloudWithIntensities point_cloud;
   carto::common::Time point_cloud_time;
-  std::tie(point_cloud, point_cloud_time) =
-      ToPointCloudWithIntensities(message);
+  bool handle_scan_as_structured_cloud_ = true;
+  static carto::common::Time last_point_cloud_time = carto::common::FromUniversal(0);
+  if (handle_scan_as_structured_cloud_) {
+    std::tie(point_cloud, point_cloud_time) = ToStructuredPointCloudWithIntensities(message);
+  } else {
+    std::tie(point_cloud, point_cloud_time) = ToPointCloudWithIntensities(message);
+  }
+  if(point_cloud_time <= last_point_cloud_time) {
+    LOG(INFO)<<"Skip pointcloud to maintain time consistency";
+    return nullptr;
+  }
+last_point_cloud_time = point_cloud_time;
+
   CHECK_EQ(point_cloud.intensities.size(), point_cloud.points.size());
 
   if (transform_interpolation_buffer.Has(point_cloud_time)) {
@@ -257,16 +268,17 @@ void AssetsWriter::Run(const std::string& configuration_directory,
                       *delayed_message.instantiate<sensor_msgs::PointCloud2>(),
                       tracking_frame, tf_buffer, transform_interpolation_buffer);
             }
-          } else if (delayed_message
-                         .isType<sensor_msgs::MultiEchoLaserScan>()) {
-            points_batch = HandleMessage(
-                *delayed_message.instantiate<sensor_msgs::MultiEchoLaserScan>(),
-                tracking_frame, tf_buffer, transform_interpolation_buffer);
-          } else if (delayed_message.isType<sensor_msgs::LaserScan>()) {
-            points_batch = HandleMessage(
-                *delayed_message.instantiate<sensor_msgs::LaserScan>(),
-                tracking_frame, tf_buffer, transform_interpolation_buffer);
           }
+//          else if (delayed_message
+//                         .isType<sensor_msgs::MultiEchoLaserScan>()) {
+//            points_batch = HandleMessage(
+//                *delayed_message.instantiate<sensor_msgs::MultiEchoLaserScan>(),
+//                tracking_frame, tf_buffer, transform_interpolation_buffer);
+//          } else if (delayed_message.isType<sensor_msgs::LaserScan>()) {
+//            points_batch = HandleMessage(
+//                *delayed_message.instantiate<sensor_msgs::LaserScan>(),
+//                tracking_frame, tf_buffer, transform_interpolation_buffer);
+//          }
           if (points_batch != nullptr) {
             points_batch->trajectory_id = trajectory_id;
             pipeline.back()->Process(std::move(points_batch));

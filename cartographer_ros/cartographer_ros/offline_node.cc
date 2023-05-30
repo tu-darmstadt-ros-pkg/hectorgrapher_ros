@@ -356,7 +356,7 @@ void RunOfflineNode(const MapBuilderFactory& map_builder_factory) {
   // final optimization, serialization, and optional indefinite spinning at the
   // end.
   clock_republish_timer.start();
-  node.RunFinalOptimization();
+//  node.RunFinalOptimization();
 
   const std::chrono::time_point<std::chrono::steady_clock> end_time =
       std::chrono::steady_clock::now();
