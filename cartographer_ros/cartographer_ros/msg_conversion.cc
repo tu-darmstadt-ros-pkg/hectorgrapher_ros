@@ -392,21 +392,22 @@ ToPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
     pcl::PointCloud<PointXYZOuster> input_cloud;
     pcl::fromROSMsg(msg, input_cloud);
     CHECK_EQ(num_points, input_cloud.points.size());
-    point_cloud.points.resize(
-        num_points, {Eigen::Vector3f{std::numeric_limits<float>::quiet_NaN(),
-                                     std::numeric_limits<float>::quiet_NaN(),
-                                     std::numeric_limits<float>::quiet_NaN()},
-                     std::numeric_limits<float>::quiet_NaN()});
-    point_cloud.intensities.resize(num_points, 0.f);
-    point_cloud.width = input_cloud.width;
-    int index = 0;
+    point_cloud.points.reserve(input_cloud.size());
+    point_cloud.intensities.reserve(input_cloud.size());
+    int num_insertions = 0;
     for (const auto& pcl_point : input_cloud.points) {
-      point_cloud.points[index] = {
-          Eigen::Vector3f{pcl_point.x, pcl_point.y, pcl_point.z}};
-      point_cloud.intensities[index] =
-          has_intensities ? pcl_point.intensity : 0.f;
-      ++index;
+      Eigen::Vector3f point{pcl_point.x, pcl_point.y, pcl_point.z};
+      size_t min_range_mm = 100;
+      if (!point.hasNaN() && pcl_point.range > min_range_mm) {
+        float point_time = pcl_point.time * 1.0E-9;
+        point_cloud.points.push_back({point, point_time});
+        point_cloud.intensities.push_back(has_intensities ? pcl_point.intensity
+                                                          : 0.f);
+        ++num_insertions;
+      }
     }
+
+    point_cloud.width = num_insertions;
     ::cartographer::common::Time timestamp = FromRos(msg.header.stamp);
     return std::make_tuple(point_cloud, timestamp);
   }
