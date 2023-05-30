@@ -141,7 +141,8 @@ std::unique_ptr<carto::sensor::ImuData> SensorBridge::ToImuData(
          "otherwise be imprecise.";
   return absl::make_unique<carto::sensor::ImuData>(carto::sensor::ImuData{
       time, sensor_to_tracking->rotation() * ToEigen(msg->linear_acceleration),
-      sensor_to_tracking->rotation() * ToEigen(msg->angular_velocity)});
+      sensor_to_tracking->rotation() * ToEigen(msg->angular_velocity),
+      sensor_to_tracking->rotation() * ToEigen(msg->orientation)});
 }
 
 void SensorBridge::HandleImuMessage(const std::string& sensor_id,
@@ -151,7 +152,7 @@ void SensorBridge::HandleImuMessage(const std::string& sensor_id,
     trajectory_builder_->AddSensorData(
         sensor_id,
         carto::sensor::ImuData{imu_data->time, imu_data->linear_acceleration,
-                               imu_data->angular_velocity});
+                               imu_data->angular_velocity, imu_data->rotation});
   }
 }
 
