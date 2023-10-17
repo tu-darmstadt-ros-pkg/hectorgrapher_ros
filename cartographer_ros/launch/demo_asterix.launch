@@ -16,8 +16,10 @@
 
 <launch>
   <param name="/use_sim_time" value="true" />
+  <param name="robot_description"
+    textfile="$(find cartographer_ros)/urdf/asterix_ugv.urdf" />
 
-  <include file="$(find cartographer_ros)/launch/taurob_tracker.launch" />
+  <include file="$(find cartographer_ros)/launch/asterix.launch" />
 
   <node name="rviz" pkg="rviz" type="rviz" required="true"
       args="-d $(find cartographer_ros)/configuration_files/demo_3d.rviz" />

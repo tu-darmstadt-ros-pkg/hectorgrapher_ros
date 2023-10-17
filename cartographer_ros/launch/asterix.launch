@@ -1,0 +1,11 @@
+<launch>
+  <node name="cartographer" pkg="cartographer_ros"
+      type="cartographer_node" args="
+          -configuration_directory $(find cartographer_ros)/configuration_files
+          -configuration_basename asterix.lua"
+      output="screen" respawn="true">
+    <remap from="points2" to="/scan_cloud_filtered"/> 
+    <remap from="imu" to="/imu/data"/>
+  </node>
+</launch>
+
