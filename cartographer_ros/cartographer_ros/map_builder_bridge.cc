@@ -34,6 +34,7 @@
 #include "cartographer_ros_msgs/StatusCode.h"
 #include "cartographer_ros_msgs/StatusResponse.h"
 #include "cartographer_ros/node_dynamic_parameters.h"
+#include "cartographer/mapping/marching_cubes.h"
 
 namespace cartographer_ros {
 namespace {
@@ -531,320 +532,67 @@ visualization_msgs::MarkerArray MapBuilderBridge::GetConstraintList() {
   return constraint_list;
 }
 
-pcl::PointXYZ MapBuilderBridge::InterpolateVertex(float isolevel,
-                                                  pcl::PointXYZ p1,
-                                                  pcl::PointXYZ p2,
-                                                  float valp1,
-                                                  float valp2) {
-  float mu;
-  pcl::PointXYZ p;
-
-  // If jump is too big, return a point with x value NAN to indicate it's false
-  if (std::abs(valp1 - valp2) > 0.95) {
-    p.x = NAN;
-    return p;
-  }
-
-  if (std::abs(isolevel - valp1) < 1e-5) {
-    return p1;
-  }
-  if (std::abs(isolevel - valp2) < 1e-5) {
-    return p2;
-  }
-  if (std::abs(valp1 - valp2) < 1e-5) {
-    p.getArray3fMap() = 0.5 * (p1.getArray3fMap() + p2.getArray3fMap());
-    return p;
-  }
-  mu = (isolevel - valp1) / (valp2 - valp1);
-  p.x = p1.x + mu * (p2.x - p1.x);
-  p.y = p1.y + mu * (p2.y - p1.y);
-  p.z = p1.z + mu * (p2.z - p1.z);
-  return p;
-}
-
-int MapBuilderBridge::ProcessCube(Cube &cube,
-                                  pcl::PointCloud<pcl::PointXYZ> &cloud,
-                                  float isolevel) {
-  int cubeindex = 0;
-  if (cube.tsd_values[0] <= isolevel) cubeindex |= 1;
-  if (cube.tsd_values[1] <= isolevel) cubeindex |= 2;
-  if (cube.tsd_values[2] <= isolevel) cubeindex |= 4;
-  if (cube.tsd_values[3] <= isolevel) cubeindex |= 8;
-  if (cube.tsd_values[4] <= isolevel) cubeindex |= 16;
-  if (cube.tsd_values[5] <= isolevel) cubeindex |= 32;
-  if (cube.tsd_values[6] <= isolevel) cubeindex |= 64;
-  if (cube.tsd_values[7] <= isolevel) cubeindex |= 128;
-
-  // Cube is entirely in/out of the surface
-  if (edge_table_[cubeindex] == 0) {
-    return 0;
-  }
-  pcl::PointXYZ vertices_list[12];
-
-  // Find the points where the surface intersects the cube
-  if (edge_table_[cubeindex] & 1) {
-    vertices_list[0] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[0],
-                          cube.vertice_pos_global[1],
-                          cube.tsd_values[0],
-                          cube.tsd_values[1]);
-  }
-  if (edge_table_[cubeindex] & 2) {
-    vertices_list[1] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[1],
-                          cube.vertice_pos_global[2],
-                          cube.tsd_values[1],
-                          cube.tsd_values[2]);
-  }
-  if (edge_table_[cubeindex] & 4) {
-    vertices_list[2] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[2],
-                          cube.vertice_pos_global[3],
-                          cube.tsd_values[2],
-                          cube.tsd_values[3]);
-  }
-  if (edge_table_[cubeindex] & 8) {
-    vertices_list[3] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[3],
-                          cube.vertice_pos_global[0],
-                          cube.tsd_values[3],
-                          cube.tsd_values[0]);
-  }
-  if (edge_table_[cubeindex] & 16) {
-    vertices_list[4] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[4],
-                          cube.vertice_pos_global[5],
-                          cube.tsd_values[4],
-                          cube.tsd_values[5]);
-  }
-  if (edge_table_[cubeindex] & 32) {
-    vertices_list[5] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[5],
-                          cube.vertice_pos_global[6],
-                          cube.tsd_values[5],
-                          cube.tsd_values[6]);
-  }
-  if (edge_table_[cubeindex] & 64) {
-    vertices_list[6] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[6],
-                          cube.vertice_pos_global[7],
-                          cube.tsd_values[6],
-                          cube.tsd_values[7]);
-  }
-  if (edge_table_[cubeindex] & 128) {
-    vertices_list[7] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[7],
-                          cube.vertice_pos_global[4],
-                          cube.tsd_values[7],
-                          cube.tsd_values[4]);
-  }
-  if (edge_table_[cubeindex] & 256) {
-    vertices_list[8] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[0],
-                          cube.vertice_pos_global[4],
-                          cube.tsd_values[0],
-                          cube.tsd_values[4]);
-  }
-  if (edge_table_[cubeindex] & 512) {
-    vertices_list[9] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[1],
-                          cube.vertice_pos_global[5],
-                          cube.tsd_values[1],
-                          cube.tsd_values[5]);
-  }
-  if (edge_table_[cubeindex] & 1024) {
-    vertices_list[10] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[2],
-                          cube.vertice_pos_global[6],
-                          cube.tsd_values[2],
-                          cube.tsd_values[6]);
-  }
-  if (edge_table_[cubeindex] & 2048) {
-    vertices_list[11] =
-        InterpolateVertex(isolevel,
-                          cube.vertice_pos_global[3],
-                          cube.vertice_pos_global[7],
-                          cube.tsd_values[3],
-                          cube.tsd_values[7]);
-  }
-
-  // Create the triangle
-  int triangle_count = 0;
-  pcl::PointXYZ triangle[3];
-  for (int i = 0; triangle_table_[cubeindex][i] != -1; i += 3) {
-    triangle[0] = vertices_list[triangle_table_[cubeindex][i]];
-    triangle[1] = vertices_list[triangle_table_[cubeindex][i + 1]];
-    triangle[2] = vertices_list[triangle_table_[cubeindex][i + 2]];
-    if (isnan(triangle[0].x) || isnan(triangle[1].x) || isnan(triangle[2].x)) continue;
-    cloud.push_back(triangle[0]);
-    cloud.push_back(triangle[1]);
-    cloud.push_back(triangle[2]);
-    triangle_count++;
-  }
-  return (triangle_count);
-
-}
-
-void MapBuilderBridge::ProcessTSDFMesh(pcl::PolygonMesh &mesh,
-                                       float cut_off_distance,
-                                       float cut_off_height,
-                                       float min_weight,
-                                       bool all_submaps) {
-  auto all_submap_data = map_builder_->pose_graph()->GetAllSubmapData();
-
-  pcl::PointCloud<pcl::PointXYZ> cloud;
-  float isolevel = 0.0f;
-  size_t count = 0;
-  bool skipped_current_submap = false;
-
-  if (!all_submap_data.empty()) {
-    for (auto const & submap_data : all_submap_data) {
-      if (!all_submaps && all_submap_data.size() > 1 && !skipped_current_submap) {
-        skipped_current_submap = true;
-        continue;
-      }
-
-      auto submap3d =
-          dynamic_cast<const ::cartographer::mapping::Submap3D *>(
-              submap_data.data.submap.get());
-
-      const ::cartographer::mapping::HybridGridTSDF *tsdf;
-      if (kTsdfVisualizationHighRes) {
-        tsdf =
-            dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
-                &submap3d->high_resolution_hybrid_grid());
-      } else {
-        tsdf =
-            dynamic_cast<const ::cartographer::mapping::HybridGridTSDF *>(
-                &submap3d->low_resolution_hybrid_grid());
-      }
-
-      float resolution = tsdf->resolution();
-      const auto
-          &robot_position = GetLocalTrajectoryData()[0].local_slam_data->local_pose.translation();
-
-      for (auto it = ::cartographer::mapping::HybridGridTSDF::Iterator(*tsdf);
-           !it.Done(); it.Next()) {
-        const ::cartographer::mapping::TSDFVoxel voxel = it.GetValue();
-        const float tsd = tsdf->ValueConverter().ValueToTSD(voxel.discrete_tsd);
-        const Eigen::Vector3f cell_center_submap = tsdf->GetCenterOfCell(it.GetCellIndex());
-        const Eigen::Vector3f
-            cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
-
-        if (voxel.discrete_weight <= min_weight) {
-          // Skip inner-object voxels
-          continue;
-        }
-
-        if (cut_off_distance >= 0.0f &&
-            (robot_position.cast<float>() - cell_center_global).norm() > cut_off_distance) {
-          // Cut-off cells that are too far away from the robot, if parameter valid (>0)
-          continue;
-        }
-
-        if (cut_off_height >= 0.0f &&
-            cell_center_global.z() - static_cast<float>(robot_position.z()) > cut_off_height) {
-          // Cut-off cells that are too high above the robot, if parameter valid (>0)
-          continue;
-        }
-
-        Cube cube;
-        for (int i = 0; i < 8; ++i) {
-          cube.vertice_ids[i] = it.GetCellIndex();
-          cube.vertice_ids[i].x() += cube.position_arr[i][0];
-          cube.vertice_ids[i].y() += cube.position_arr[i][1];
-          cube.vertice_ids[i].z() += cube.position_arr[i][2];
-          cube.vertice_pos_global[i].x =
-              cell_center_global.x() + static_cast<float>(cube.position_arr[i][0]) * resolution;
-          cube.vertice_pos_global[i].y =
-              cell_center_global.y() + static_cast<float>(cube.position_arr[i][1]) * resolution;
-          cube.vertice_pos_global[i].z =
-              cell_center_global.z() + static_cast<float>(cube.position_arr[i][2]) * resolution;
-          cube.tsd_weights[i] = tsdf->GetWeight(cube.vertice_ids[i]);
-
-          cube.tsd_values[i] =
-              cube.tsd_weights[i] <= 0.0f ? tsd : tsdf->GetTSD(cube.vertice_ids[i]);
-        }
-        count += ProcessCube(cube, cloud, isolevel);
-
-      }
-    }
-    LOG(INFO) << "[TSDF Mesh] Triangles in Cloud: " << cloud.size() / 3;
-
-    pcl::toPCLPointCloud2(cloud, mesh.cloud);
-
-    for (size_t i = 0; i < count; i++) {
-      pcl::Vertices v;
-      v.vertices.push_back(i * 3 + 0);
-      v.vertices.push_back(i * 3 + 2);
-      v.vertices.push_back(i * 3 + 1);
-      mesh.polygons.push_back(v);
-    }
-  }
-}
-
 visualization_msgs::Marker MapBuilderBridge::GetTSDFMeshMarker() {
   visualization_msgs::Marker marker;
   pcl::PolygonMesh mesh;
-  ProcessTSDFMesh(mesh,
-                  static_cast<float>(cartographer_ros::kTsdfMeshCutOffDistance),
-                  static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight),
-                  0.0f,
-                  false);
+  const auto &all_submap_data = map_builder_->pose_graph()->GetAllSubmapData();
+  if (!all_submap_data.empty()) {
+    const auto
+        &robot_position =
+        GetLocalTrajectoryData()[0].local_slam_data->local_pose.translation().cast<float>();
 
-  std_msgs::ColorRGBA color;
-  marker.header.frame_id = "world_cartographer";
-  marker.header.stamp = ::ros::Time::now();
-  marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
-  marker.action = visualization_msgs::Marker::ADD;
-  marker.scale.x = 1.0;
-  marker.scale.y = 1.0;
-  marker.scale.z = 1.0;
-  marker.pose.position.x = 0.0;
-  marker.pose.position.y = 0.0;
-  marker.pose.position.z = 0.0;
-  marker.pose.orientation.x = 0.0;
-  marker.pose.orientation.y = 0.0;
-  marker.pose.orientation.z = 0.0;
-  marker.pose.orientation.w = 1.0;
+    cartographer::mapping::MarchingCubes::ProcessTSDFMesh(mesh,
+                                                          all_submap_data,
+                                                          robot_position,
+                                                          kTsdfVisualizationHighRes,
+                                                          static_cast<float>(cartographer_ros::kTsdfMeshCutOffDistance),
+                                                          static_cast<float>(cartographer_ros::kTsdfMeshCutOffHeight),
+                                                          0.0f,
+                                                          false);
 
-  pcl::PointCloud<pcl::PointXYZ> cloud;
-  pcl::fromPCLPointCloud2(mesh.cloud, cloud);
+    std_msgs::ColorRGBA color;
+    marker.header.frame_id = "world_cartographer";
+    marker.header.stamp = ::ros::Time::now();
+    marker.type = visualization_msgs::Marker::TRIANGLE_LIST;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.scale.x = 1.0;
+    marker.scale.y = 1.0;
+    marker.scale.z = 1.0;
+    marker.pose.position.x = 0.0;
+    marker.pose.position.y = 0.0;
+    marker.pose.position.z = 0.0;
+    marker.pose.orientation.x = 0.0;
+    marker.pose.orientation.y = 0.0;
+    marker.pose.orientation.z = 0.0;
+    marker.pose.orientation.w = 1.0;
 
-  for (auto &vertice_group : mesh.polygons) {
-    for (auto &vertice : vertice_group.vertices) {
-      geometry_msgs::Point temp_point;
-      temp_point.x = cloud[vertice].x;
-      temp_point.y = cloud[vertice].y;
-      temp_point.z = cloud[vertice].z;
-      marker.points.push_back(temp_point);
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+    pcl::fromPCLPointCloud2(mesh.cloud, cloud);
+
+    for (auto &vertice_group: mesh.polygons) {
+      for (auto &vertice: vertice_group.vertices) {
+        geometry_msgs::Point temp_point;
+        temp_point.x = cloud[vertice].x;
+        temp_point.y = cloud[vertice].y;
+        temp_point.z = cloud[vertice].z;
+        marker.points.push_back(temp_point);
+      }
+      Eigen::Vector3f u = {cloud[vertice_group.vertices[1]].x - cloud[vertice_group.vertices[0]].x,
+                           cloud[vertice_group.vertices[1]].y - cloud[vertice_group.vertices[0]].y,
+                           cloud[vertice_group.vertices[1]].z - cloud[vertice_group.vertices[0]].z};
+      Eigen::Vector3f v = {cloud[vertice_group.vertices[2]].x - cloud[vertice_group.vertices[0]].x,
+                           cloud[vertice_group.vertices[2]].y - cloud[vertice_group.vertices[0]].y,
+                           cloud[vertice_group.vertices[2]].z - cloud[vertice_group.vertices[0]].z};
+      Eigen::Vector3f normal = u.cross(v).normalized();
+      std_msgs::ColorRGBA surface_color;
+      surface_color.r = (normal.x() + 1.0f) * 0.5f;
+      surface_color.g = (normal.y() + 1.0f) * 0.5f;
+      surface_color.b = (normal.z() + 1.0f) * 0.5f;
+      surface_color.a = 1;
+      marker.colors.push_back(surface_color);
+      marker.colors.push_back(surface_color);
+      marker.colors.push_back(surface_color);
     }
-    Eigen::Vector3f u = {cloud[vertice_group.vertices[1]].x - cloud[vertice_group.vertices[0]].x,
-                         cloud[vertice_group.vertices[1]].y - cloud[vertice_group.vertices[0]].y,
-                         cloud[vertice_group.vertices[1]].z - cloud[vertice_group.vertices[0]].z};
-    Eigen::Vector3f v = {cloud[vertice_group.vertices[2]].x - cloud[vertice_group.vertices[0]].x,
-                         cloud[vertice_group.vertices[2]].y - cloud[vertice_group.vertices[0]].y,
-                         cloud[vertice_group.vertices[2]].z - cloud[vertice_group.vertices[0]].z};
-    Eigen::Vector3f normal = u.cross(v).normalized();
-    std_msgs::ColorRGBA surface_color;
-    surface_color.r = (normal.x() + 1.0f) * 0.5f;
-    surface_color.g = (normal.y() + 1.0f) * 0.5f;
-    surface_color.b = (normal.z() + 1.0f) * 0.5f;
-    surface_color.a = 1;
-    marker.colors.push_back(surface_color);
-    marker.colors.push_back(surface_color);
-    marker.colors.push_back(surface_color);
   }
 
   return marker;
@@ -852,70 +600,26 @@ visualization_msgs::Marker MapBuilderBridge::GetTSDFMeshMarker() {
 
 bool MapBuilderBridge::WriteTSDFMesh(const std::string &filename, const float min_weight) {
   pcl::PolygonMesh mesh;
-  ProcessTSDFMesh(mesh, -1.0f, -1.0f, min_weight, true);
+  const auto &all_submap_data = map_builder_->pose_graph()->GetAllSubmapData();
+  const auto &robot_position = Eigen::Matrix<float, 3, 1>{NAN, NAN, NAN};
 
-  pcl::PointCloud<pcl::PointXYZ> cloud;
-  pcl::fromPCLPointCloud2(mesh.cloud, cloud);
+  cartographer::mapping::MarchingCubes::ProcessTSDFMesh(mesh,
+                                                        all_submap_data,
+                                                        robot_position,
+                                                        kTsdfVisualizationHighRes,
+                                                        -1.0f,
+                                                        -1.0f,
+                                                        min_weight,
+                                                        true);
 
-  std::ofstream file;
-  file.open(filename + ".ply", std::ofstream::out | std::ofstream::binary);
-
-  if (file.is_open()) {
-    std::size_t cloud_size, polygon_size;
-    const unsigned char count = 3;
-    Eigen::Vector3f u, v, normal;
-    u_char r, g, b;
-    cloud_size = cloud.size();
-    polygon_size = mesh.polygons.size();
-
-    file << "ply\n";
-    file << "format binary_little_endian 1.0\n";
-    file << "comment Created by Cartographer\n";
-    file << "element vertex " << cloud_size << std::endl;
-    file << "property float x\n";
-    file << "property float y\n";
-    file << "property float z\n";
-    file << "element face " << polygon_size << std::endl;
-    file << "property list uchar uint vertex_indices\n";
-    file << "property uchar red\n";
-    file << "property uchar green\n";
-    file << "property uchar blue\n";
-    file << "end_header\n";
-
-    for (auto &p : cloud.points) {
-      file.write(reinterpret_cast<const char *>(&(p.x)), sizeof(float));
-      file.write(reinterpret_cast<const char *>(&(p.y)), sizeof(float));
-      file.write(reinterpret_cast<const char *>(&(p.z)), sizeof(float));
-    }
-    for (auto &vertice_group : mesh.polygons) {
-      // Write the number of elements
-      file.write(reinterpret_cast<const char *>(&count), sizeof(unsigned char));
-      file.write(reinterpret_cast<const char *>(&(vertice_group.vertices[0])), sizeof(uint32_t));
-      file.write(reinterpret_cast<const char *>(&(vertice_group.vertices[1])), sizeof(uint32_t));
-      file.write(reinterpret_cast<const char *>(&(vertice_group.vertices[2])), sizeof(uint32_t));
-      // Write the colors
-      u = {cloud[vertice_group.vertices[1]].x - cloud[vertice_group.vertices[0]].x,
-           cloud[vertice_group.vertices[1]].y - cloud[vertice_group.vertices[0]].y,
-           cloud[vertice_group.vertices[1]].z - cloud[vertice_group.vertices[0]].z};
-      v = {cloud[vertice_group.vertices[2]].x - cloud[vertice_group.vertices[0]].x,
-           cloud[vertice_group.vertices[2]].y - cloud[vertice_group.vertices[0]].y,
-           cloud[vertice_group.vertices[2]].z - cloud[vertice_group.vertices[0]].z};
-      normal = u.cross(v).normalized();
-      r = static_cast<u_char>((normal.x() + 1.0f) * 0.5f * 255);
-      g = static_cast<u_char>((normal.y() + 1.0f) * 0.5f * 255);
-      b = static_cast<u_char>((normal.z() + 1.0f) * 0.5f * 255);
-      file.write(reinterpret_cast<const char *>(&r), 1 * sizeof(u_char));
-      file.write(reinterpret_cast<const char *>(&g), 1 * sizeof(u_char));
-      file.write(reinterpret_cast<const char *>(&b), 1 * sizeof(u_char));
-    }
-
-    file.close();
-    LOG(INFO) << "Exported TSDF Mesh as PLY to " << boost::filesystem::complete(filename + ".ply").string();
-
-    return true;
-  }
+  std::stringstream stream;
+  cartographer::mapping::MarchingCubes::WriteTSDFToStringstream(stream, mesh);
+  stream.seekg(0, std::ios::end);
+  std::ofstream file(filename + ".ply", std::ofstream::out | std::ofstream::binary);
+  file.write(stream.str().data(), stream.tellg());
   file.close();
-  LOG(ERROR) << "Cannot write file to " << boost::filesystem::complete(filename + ".ply").string();
+  LOG(INFO) << "Exported TSDF Mesh as PLY to "
+            << boost::filesystem::complete(filename + ".ply").string();
 
   return false;
 }
@@ -954,8 +658,8 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFPointsMarker() {
       const Eigen::Vector3f
           cell_center_global = submap3d->local_pose().cast<float>() * cell_center_submap;
 
-      if (voxel.discrete_weight == 0) {
-        // Skip inner-object voxels
+      if (tsd < 0.0f || tsd >= resolution || voxel.discrete_weight == 0) {
+        // Skip inner-object voxels with TSD < 0 with TSD in [min_tsd, max_tsd], eg [-0.25, 0.25]
         continue;
       }
 
@@ -971,10 +675,8 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFPointsMarker() {
         continue;
       }
 
-      if (tsd >= 0 && tsd < resolution) {
-        cells.emplace_back(cell_center_global[0], cell_center_global[1],
-                           cell_center_global[2], tsd);
-      }
+      cells.emplace_back(cell_center_global[0], cell_center_global[1],
+                         cell_center_global[2], tsd);
     }
 
     msg = ToPointCloud2Message(
@@ -1032,7 +734,7 @@ sensor_msgs::PointCloud2 MapBuilderBridge::GetTSDFSliceMarker() {
       Eigen::Vector3f slice_center = {slice_center_x, slice_center_y, slice_center_z};
 
       if (voxel.discrete_weight == 0) {
-        // Skip inner-object voxels
+        // Skip zero weight voxels
         continue;
       }
 
